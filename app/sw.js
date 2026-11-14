@@ -1,5 +1,5 @@
 // Offline support: app shell is precached; stroke data and audio are cached the first time they're used.
-const VERSION = "v5";
+const VERSION = "v6";
 const SHELL = ["./", "index.html", "styles.css", "js/app.js", "js/srs.js", "js/store.js",
   "vendor/hanzi-writer.min.js", "data/hsk1.json", "data/charlevels.json", "manifest.webmanifest", "icon.svg", "icon-180.png"];
 

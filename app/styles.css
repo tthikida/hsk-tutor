@@ -247,3 +247,17 @@ pre { white-space: pre-wrap; }
 .streak .week .today i { outline: 2px solid var(--ink); outline-offset: 2px; }
 .streak .week .today span { color: var(--ink); font-weight: 700; }
 .done .streak { margin: 18px 0 0; }
+
+/* writing drill */
+.drill { display: flex; flex-direction: column; align-items: stretch; }
+.drill [data-dhelp] { min-height: 32px; }
+.drill-targets { display: flex; justify-content: center; gap: 6px; margin: 6px 0; }
+.drill-targets .chip { font-family: var(--hz-font); font-size: 18px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+.drill-targets .chip.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.drill-prompt { text-align: center; margin: 8px 0 4px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; font-size: 16px; }
+.drill-char { font-size: 26px; }
+.drill-status { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 13px; color: var(--muted); min-height: 20px; }
+.drill-dots { display: flex; flex-wrap: wrap; gap: 3px; max-width: 200px; }
+.drill-dots i { width: 9px; height: 9px; border-radius: 50%; }
+.drill-dots .good { background: var(--ok); } .drill-dots .ok { background: #e0a030; } .drill-dots .bad { background: var(--accent); }
+.drill-writer { display: flex; flex-direction: column; align-items: center; margin-top: 6px; }

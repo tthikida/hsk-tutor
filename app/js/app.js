@@ -188,12 +188,14 @@ function ensureVisible(node, smooth = true) {
 /** Quiz the user on each character in turn. Resolves with total mistakes and hints used.
  *  outline: true/false, or a function (char, index) -> bool for per-character outlines.
  *  onChar(i): called before each character (and with chars.length at the end); progress: false hides the built-in progress row.
- *  focus: the element to keep on screen (defaults to the writing box). */
-function quizWord(el, text, { outline = false, onChar = null, progress = true, focus = null } = {}) {
+ *  focus: the element to keep on screen (defaults to the writing box).
+ *  alive(): return false to abandon this run (e.g. the drill switched modes); it then never resolves or redraws. */
+function quizWord(el, text, { outline = false, onChar = null, progress = true, focus = null, alive = () => true } = {}) {
   const chars = [...text].filter(hasStrokes);
   let i = 0, mistakes = 0;
   return new Promise(resolve => {
     const next = () => {
+      if (!alive()) return;
       onChar?.(i);
       if (i >= chars.length) {
         el.querySelectorAll(".writer-progress span").forEach((s, j) => { s.className = "done"; s.textContent = chars[j]; });
@@ -228,6 +230,79 @@ function quizWord(el, text, { outline = false, onChar = null, progress = true, f
     };
     next();
   });
+}
+
+/* ---------------- writing drill: same character over and over ---------------- */
+const DRILL_MODES = { trace: "Trace", memory: "Memory", auto: "Auto" };
+const DRILL_HELP = {
+  trace: "Trace over the outline as many times as you like.",
+  memory: "No outline — write it from memory. Hint shows the outline if you're stuck.",
+  auto: "Starts with tracing; turns it off after 3 clean reps in a row, back on if you struggle.",
+};
+function drillPrompt(text) {
+  const w = words[text];
+  if (w) return `${pinyinHTML(w.py, w.num)} <span class="muted">· ${esc(w.en.slice(0, 2).map(s => s.replace(/\s*\(.*?\)/g, "")).join("; "))}</span>`;
+  const c = D.chars[text] || {};
+  return `<span class="py">${esc((c.py || []).join(", "))}</span> <span class="muted">· ${esc(shortDef(text) || "")}</span>`;
+}
+/** Repeat-writing drill. Remembers the chosen mode between drills. */
+function startDrill(host, text) {
+  const S = store.S();
+  const chars = [...text].filter(hasStrokes);
+  let target = chars.length > 1 ? text : chars[0];
+  let mode = S.settings.drillMode || "trace";
+  let outline = mode !== "memory", clean = 0, run = 0;
+  let results = [];
+
+  host.innerHTML = `<div class="drill">
+    <div class="seg" data-dmodes>${Object.entries(DRILL_MODES).map(([m, l]) => `<button data-dm="${m}" class="${m === mode ? "on" : ""}">${l}</button>`).join("")}</div>
+    <div class="muted small center" data-dhelp></div>
+    ${chars.length > 1 ? `<div class="chips center drill-targets">
+      <button class="chip on" data-dt="${esc(text)}">${esc(text)}</button>
+      ${chars.map(c => `<button class="chip" data-dt="${esc(c)}">${esc(c)}</button>`).join("")}</div>` : ""}
+    <div class="drill-prompt" data-dprompt></div>
+    <div class="drill-status"><span data-dcount></span><span class="drill-dots" data-ddots></span></div>
+    <div class="drill-writer" data-dwriter></div>
+  </div>`;
+  const $d = s => host.querySelector(s);
+
+  const drawStatus = () => {
+    const n = results.length, cleanN = results.filter(m => m === 0).length;
+    $d("[data-dcount]").innerHTML = n ? `<b>${n}</b> rep${n === 1 ? "" : "s"} · ${cleanN} clean` : "Rep 1";
+    $d("[data-ddots]").innerHTML = results.slice(-24).map(m => `<i class="${m === 0 ? "good" : m <= 2 ? "ok" : "bad"}" title="${m} mistakes"></i>`).join("");
+    $d("[data-dhelp]").textContent = mode === "auto" ? `${DRILL_HELP.auto} Tracing is ${outline ? "on" : "off"} now.` : DRILL_HELP[mode];
+    // in memory (no outline) hide the character itself: prompt with pinyin + meaning only
+    $d("[data-dprompt]").innerHTML = `${outline ? `<span class="hz-inline drill-char">${esc(target)}</span> ` : ""}${drillPrompt(target)}
+      ${audioButtons(words[target] ? "w" : "c", target)}`;
+  };
+  const rep = () => {
+    const my = ++run;
+    drawStatus();
+    const multi = [...target].filter(hasStrokes).length > 1;
+    quizWord($d("[data-dwriter]"), target, { outline, progress: multi, alive: () => my === run && host.isConnected }).then(({ mistakes }) => {
+      results.push(mistakes);
+      let msg = mistakes === 0 ? "✓ Clean!" : `${mistakes} mistake${mistakes === 1 ? "" : "s"}`;
+      if (mode === "auto") {
+        if (outline) { clean = mistakes === 0 ? clean + 1 : 0; if (clean >= 3) { outline = false; clean = 0; msg = "3 clean in a row — tracing off now!"; } }
+        else if (mistakes >= 4) { outline = true; clean = 0; msg = "Tracing back on for a few reps"; }
+      }
+      toast(msg);
+      drawStatus();
+      setTimeout(() => { if (my === run && host.isConnected) rep(); }, 700);
+    });
+  };
+  host.querySelectorAll("[data-dm]").forEach(b => b.onclick = () => {
+    mode = b.dataset.dm; S.settings.drillMode = mode; store.save();
+    outline = mode !== "memory"; clean = 0;
+    host.querySelectorAll("[data-dm]").forEach(x => x.classList.toggle("on", x === b));
+    rep();
+  });
+  host.querySelectorAll("[data-dt]").forEach(b => b.onclick = () => {
+    target = b.dataset.dt; results = []; clean = 0; outline = mode !== "memory";
+    host.querySelectorAll("[data-dt]").forEach(x => x.classList.toggle("on", x === b));
+    rep();
+  });
+  rep();
 }
 
 function animateWord(el, text) {
@@ -561,8 +636,9 @@ function renderSheet() {
   if (!e) return closeSheet();
   sh.hidden = false; document.body.classList.add("sheet-open");
   const body = e.type === "char" ? charSheet(e.c) : e.type === "preview" ? previewSheet(e.c)
-    : e.type === "sentence" ? `<div class="sp-host"></div>` : itemSheet(e.key);
-  const crumb = x => x.type === "char" || x.type === "preview" ? x.c : x.type === "sentence" ? "✍️ sentence" : x.key.slice(2);
+    : e.type === "sentence" ? `<div class="sp-host"></div>` : e.type === "drill" ? `<div class="drill-host"></div>` : itemSheet(e.key);
+  const crumb = x => x.type === "char" || x.type === "preview" ? x.c : x.type === "sentence" ? "✍️ sentence"
+    : x.type === "drill" ? `✍️ ${x.text}` : x.key.slice(2);
   sh.innerHTML = `<div class="sheet-scrim" data-close></div><div class="sheet-panel">
     <div class="sheet-bar">${sheetStack.length > 1 ? `<button class="icon-btn" data-back aria-label="Back">‹</button>` : `<span></span>`}
     <div class="crumbs">${sheetStack.map(x => esc(crumb(x))).join(" › ")}</div>
@@ -571,7 +647,8 @@ function renderSheet() {
   const back = $("[data-back]", sh); if (back) back.onclick = () => { sheetStack.pop(); renderSheet(); };
   const anim = $(".anim-row", sh); if (anim) animateWord(anim, anim.dataset.text);
   const pr = $("[data-practice]", sh);
-  if (pr) pr.onclick = () => { const a = $(".practice-area", sh); a.hidden = false; quizWord(a, pr.dataset.practice, { outline: true }).then(() => toast("Nice!")); };
+  if (pr) pr.onclick = () => openSheet({ type: "drill", text: pr.dataset.practice });
+  const dh = $(".drill-host", sh); if (dh) startDrill(dh, e.text);
   const host = $(".sp-host", sh);
   if (host) {
     const next = mode => { const pool = sentencePool().filter(w => w !== e.wid); e.wid = pool[Math.floor(Math.random() * pool.length)] || e.wid; sentencePractice(host, e.wid, { mode, onNext: next }); };
@@ -593,7 +670,7 @@ function charSheet(c) {
     ${hasStrokes(c) ? `<div class="anim-row" data-text="${esc(c)}"></div>` : ""}
     <div class="row">${key ? `<button class="btn" data-item="${esc(key)}">Open card${key.slice(2) !== c ? ` (${esc(key.slice(2))})` : ""}</button>` : ""}
       ${hasStrokes(c) ? `<button class="btn ghost" data-practice="${esc(c)}">Practice writing</button>` : ""}</div>
-    <div class="practice-area" hidden></div>`;
+    `;
 }
 function itemSheet(key) {
   const it = itemInfo(key);
@@ -602,7 +679,7 @@ function itemSheet(key) {
     : `<div class="center"><span class="badge">not learned yet</span></div>`;
   return `${answerHTML(key)}${status}
     ${[...it.text].some(hasStrokes) ? `<div class="anim-row" data-text="${esc(it.text)}"></div>
-    <div class="row"><button class="btn ghost" data-practice="${esc(it.text)}">Practice writing</button></div><div class="practice-area" hidden></div>` : ""}`;
+    <div class="row"><button class="btn ghost" data-practice="${esc(it.text)}">Practice writing</button></div>` : ""}`;
 }
 function dueLabel(c) {
   const ms = c.due - Date.now();
