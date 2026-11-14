@@ -69,7 +69,7 @@ function play(kind, text, voice, quiet = false) {
 const hasAudio = (kind, text) => (audioIndex[`${kind}_${hex(text)}`] || []).length > 0;
 
 function audioButtons(kind, text) {
-  if (!hasAudio(kind, text)) return `<span class="muted small">audio pending</span>`;
+  if (!hasAudio(kind, text)) return kind === "c" ? "" : `<span class="muted small">audio pending</span>`;
   return `<span class="audio-btns">
     <button class="icon-btn" data-play="${kind}|${esc(text)}|f" aria-label="Female voice">🔊<small>女</small></button>
     <button class="icon-btn" data-play="${kind}|${esc(text)}|m" aria-label="Male voice">🔊<small>男</small></button></span>`;
@@ -152,7 +152,7 @@ function answerHTML(key, { showHanzi = true } = {}) {
     ${showHanzi ? hanziHTML(it.id) : ""}
     <div class="badge">component</div>
     <div class="meaning">${esc(c.def || "")}</div>
-    ${c.py?.length ? `<div class="py-line"><span class="py">${esc(c.py.join(", "))}</span></div>` : ""}
+    ${c.py?.length ? `<div class="py-line"><span class="py">${esc(c.py.join(", "))}</span> ${audioButtons("c", it.id)}</div>` : ""}
     ${c.hint ? `<div class="hint">${esc(c.hint)}</div>` : ""}
     ${partsHTML(it.id)}
     ${usedInHTML(it.id)}
@@ -353,10 +353,55 @@ function startSession() {
   nextCard();
 }
 
+/* ---------------- daily streak ---------------- */
+const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const daysBefore = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() - n);
+/** Study days as {"YYYY-MM-DD": cards}. Built once from the review log for progress made before streaks existed. */
+function activityDays() {
+  const S = store.S();
+  if (!S.days) {
+    S.days = {};
+    for (const [ts] of S.log || []) { const k = dayKey(new Date(ts)); S.days[k] = (S.days[k] || 0) + 1; }
+    for (const ts of Object.values(S.introduced)) if (+ts) S.days[dayKey(new Date(+ts))] ||= 1;
+    store.save();
+  }
+  return S.days;
+}
+function markActive() { const d = activityDays(), k = dayKey(); d[k] = (d[k] || 0) + 1; }
+/** Current streak counts today if you've studied, otherwise it's still alive from yesterday until midnight. */
+function streakInfo() {
+  const d = activityDays(), now = new Date();
+  const todayDone = !!d[dayKey(now)];
+  let n = 0;
+  for (let i = todayDone ? 0 : 1; d[dayKey(daysBefore(now, i))]; i++) n++;
+  let best = 0, run = 0, prev = null;
+  for (const k of Object.keys(d).sort()) {
+    const [y, m, dd] = k.split("-").map(Number), cur = new Date(y, m - 1, dd);
+    run = prev && Math.round((cur - prev) / 86400000) === 1 ? run + 1 : 1;
+    best = Math.max(best, run); prev = cur;
+  }
+  return { n, todayDone, best: Math.max(best, n), today: d[dayKey(now)] || 0 };
+}
+function streakHTML() {
+  const { n, todayDone, best, today } = streakInfo();
+  const d = activityDays(), now = new Date();
+  const week = [...Array(7)].map((_, i) => daysBefore(now, 6 - i));
+  const msg = todayDone ? `Done for today · ${today} card${today === 1 ? "" : "s"}`
+    : n ? "Study today to keep it going" : "Study today to start a streak";
+  return `<section class="streak ${todayDone ? "on" : ""}">
+    <div class="streak-main"><span class="flame">${todayDone ? "🔥" : n ? "⏳" : "🌱"}</span>
+      <div><b>${n} day${n === 1 ? "" : "s"}</b><span>${msg}</span></div>
+      ${best > 1 ? `<small>best ${best}</small>` : ""}</div>
+    <div class="week">${week.map((day, i) => `<div class="${d[dayKey(day)] ? "hit" : ""} ${i === 6 ? "today" : ""}">
+      <i></i><span>${"SMTWTFS"[day.getDay()]}</span></div>`).join("")}</div>
+  </section>`;
+}
+
 function introduce(key) {
   const S = store.S(), now = Date.now(), type = key[0], id = key.slice(2);
   S.introduced[key] = now;
   S.daily.newCount++;
+  markActive();
   const facets = FACETS[type].filter(f => f !== "write" || [...id].some(hasStrokes));
   const added = [];
   for (const f of facets) {
@@ -384,6 +429,7 @@ function grade(cid, g) {
   S.cards[cid] = review(S.cards[cid], g);
   S.log.push([Date.now(), cid, g]);
   if (S.log.length > 5000) S.log.splice(0, S.log.length - 5000);
+  markActive();
   store.save();
   session.done++;
   if (g === 1) session.q.splice(Math.min(session.q.length, 4), 0, { kind: "card", id: cid }); // see it again soon
@@ -418,7 +464,7 @@ function renderIntro(key) {
       <button class="btn primary full" data-gotit>Got it</button>
     </main>`;
   animateWord($(".anim-row", el), it.text);
-  if (it.type === "w" && store.S().settings.autoplay) play("w", it.w.s, null, true);
+  if (store.S().settings.autoplay) play(it.type, it.text, null, true);
   $("[data-gotit]", el).onclick = () => { introduce(key); nextCard(); };
   bindHome(el);
 }
@@ -428,7 +474,7 @@ function renderCard(cid) {
   const key = cid.slice(0, cid.lastIndexOf(":"));
   const it = itemInfo(key);
   const el = view();
-  const autoplay = store.S().settings.autoplay && it.type === "w";
+  const autoplay = store.S().settings.autoplay;
   const title = `${FACET_LABEL[facet]}${it.type === "c" ? " · component" : ""}`;
   let front = "";
   if (facet === "read") front = hanziHTML(it.text, { tappable: false }) + (it.type === "w" ? tradHTML(it.w) : "");
@@ -452,7 +498,7 @@ function renderCard(cid) {
     $("[data-reveal]", el).hidden = true;
     $(".grade-slot", el).innerHTML = gradeBar(cid, suggested);
     bindGrades(el, cid);
-    if (autoplay && facet !== "listen") play("w", it.text, null, true);
+    if (autoplay && facet !== "listen") play(it.type, it.text, null, true);
     $(".grade-slot", el).scrollIntoView({ behavior: "smooth", block: "end" });
   };
   $("[data-reveal]", el).onclick = () => reveal();
@@ -500,6 +546,7 @@ function renderDone() {
   session = null;
   view().innerHTML = `<main class="card done"><div class="hz big">好</div>
     <h2>All done for now</h2><p class="muted">${n} review${n === 1 ? "" : "s"} this session.</p>
+    ${streakHTML()}
     <button class="btn primary full" data-home>Home</button></main>`;
   bindHome(view());
 }
@@ -513,8 +560,9 @@ function renderSheet() {
   const e = sheetStack[sheetStack.length - 1];
   if (!e) return closeSheet();
   sh.hidden = false; document.body.classList.add("sheet-open");
-  const body = e.type === "char" ? charSheet(e.c) : e.type === "sentence" ? `<div class="sp-host"></div>` : itemSheet(e.key);
-  const crumb = x => x.type === "char" ? x.c : x.type === "sentence" ? "✍️ sentence" : x.key.slice(2);
+  const body = e.type === "char" ? charSheet(e.c) : e.type === "preview" ? previewSheet(e.c)
+    : e.type === "sentence" ? `<div class="sp-host"></div>` : itemSheet(e.key);
+  const crumb = x => x.type === "char" || x.type === "preview" ? x.c : x.type === "sentence" ? "✍️ sentence" : x.key.slice(2);
   sh.innerHTML = `<div class="sheet-scrim" data-close></div><div class="sheet-panel">
     <div class="sheet-bar">${sheetStack.length > 1 ? `<button class="icon-btn" data-back aria-label="Back">‹</button>` : `<span></span>`}
     <div class="crumbs">${sheetStack.map(x => esc(crumb(x))).join(" › ")}</div>
@@ -539,7 +587,7 @@ function charSheet(c) {
     : info.hint ? `<div class="hint">${esc(info.hint)}</div>` : "";
   return `${hanziHTML(c, { tappable: false })}${w ? tradHTML(w) : ""}
     <div class="center">${charKnown(c) ? `<span class="badge known">learned</span>` : `<span class="badge">not learned yet</span>`}</div>
-    ${w ? `<div class="py-line">${pinyinHTML(w.py, w.num)} ${audioButtons("w", c)}</div>` : info.py?.length ? `<div class="py-line"><span class="py">${esc(info.py.join(", "))}</span></div>` : ""}
+    ${w ? `<div class="py-line">${pinyinHTML(w.py, w.num)} ${audioButtons("w", c)}</div>` : info.py?.length ? `<div class="py-line"><span class="py">${esc(info.py.join(", "))}</span> ${audioButtons("c", c)}</div>` : ""}
     <div class="meaning">${esc(w ? w.en.join("; ") : info.def || "")}</div>
     ${etym}${partsHTML(c)}${usedInHTML(c)}
     ${hasStrokes(c) ? `<div class="anim-row" data-text="${esc(c)}"></div>` : ""}
@@ -564,6 +612,121 @@ function dueLabel(c) {
   return d < 1 ? "today" : `in ${d}d`;
 }
 
+/* ---------------- character chart ---------------- */
+let CL = null, L1 = null, chartZoom = 1, chartScroll = 0;
+const loadCharLevels = async () => CL || (CL = await fetch("data/charlevels.json").then(r => r.json()));
+const TIER_LABEL = ["not yet", "new", "learning", "solid (3+ weeks)"];
+
+/** Level-1 characters in study order (the same order the chart fills in). */
+function level1Chars() {
+  if (!L1) {
+    const seen = new Set();
+    for (const o of D.order) if (o.type === "word") for (const c of words[o.id].s) if (D.chars[c]) seen.add(c);
+    L1 = [...seen];
+  }
+  return L1;
+}
+
+/** Memory tier per character from the strongest read/write card that contains it:
+ *  1 = introduced, 2 = remembered 3+ days, 3 = remembered 3+ weeks. Characters you haven't met are absent (tier 0). */
+function charTiers() {
+  const best = {};
+  for (const key of Object.keys(store.S().introduced)) for (const c of key.slice(2)) best[c] ??= 0;
+  for (const [id, card] of Object.entries(allCards())) {
+    if (!/:(read|write)$/.test(id)) continue;
+    for (const c of id.slice(2, id.lastIndexOf(":"))) best[c] = Math.max(best[c] ?? 0, card.s || 0);
+  }
+  const t = {};
+  for (const [c, s] of Object.entries(best)) t[c] = s >= 21 ? 3 : s >= 3 ? 2 : 1;
+  return t;
+}
+
+/** Most recently introduced characters, newest first. */
+function recentChars(n) {
+  const when = {};
+  for (const [key, ts] of Object.entries(store.S().introduced)) for (const c of key.slice(2)) if (D.chars[c] && level1Chars().includes(c)) when[c] = Math.max(when[c] || 0, +ts || 0);
+  return Object.keys(when).sort((a, b) => when[b] - when[a]).slice(0, n);
+}
+
+function homeChartHTML() {
+  const chars = level1Chars(), t = charTiers();
+  const met = chars.filter(c => t[c]).length;
+  const recent = recentChars(10);
+  return `<button class="charmap" data-chart aria-label="Open character chart">
+    <div class="charmap-head"><b>Characters</b><span>${met} / ${chars.length} · HSK 1</span><span class="chev">›</span></div>
+    <div class="charmap-grid">${chars.map(c => `<i class="k${t[c] || 0}"></i>`).join("")}</div>
+    ${recent.length ? `<div class="charmap-recent"><span class="muted small">Latest</span> ${recent.map(c => `<span class="k${t[c]}">${esc(c)}</span>`).join("")}</div>`
+      : `<div class="muted small">Characters light up here as you learn them.</div>`}
+  </button>`;
+}
+
+const ZOOM_SIZE = [0, 44, 34, 27, 21, 17, 14, 11];   // tile size (px) when showing 1..7 levels
+async function renderChart() {
+  const data = await loadCharLevels();
+  const lv = data.levels, max = lv.length;
+  chartZoom = Math.min(Math.max(chartZoom, 1), max);
+  const t = charTiers(), sz = ZOOM_SIZE[chartZoom], showText = sz >= 17;
+  const shown = lv.slice(0, chartZoom);
+  const total = shown.reduce((n, l) => n + l.chars.length, 0);
+  const met = shown.reduce((n, l) => n + [...l.chars].filter(c => t[c]).length, 0);
+  const range = chartZoom === 1 ? "HSK 1" : `HSK 1–${lv[chartZoom - 1].label.replace("HSK ", "").split("–").pop()}`;
+  view().innerHTML = `${simpleHeader("Character chart")}<main class="chart-wrap">
+    <div class="chart-bar">
+      <button class="icon-btn zoom" data-zoom="1" ${chartZoom === max ? "disabled" : ""} aria-label="Zoom out">−</button>
+      <div class="chart-range"><b>${range}</b><span>${met} / ${total} characters</span></div>
+      <button class="icon-btn zoom" data-zoom="-1" ${chartZoom === 1 ? "disabled" : ""} aria-label="Zoom in">+</button>
+    </div>
+    <div class="legend">${[0, 1, 2, 3].map(k => `<span><i class="k${k}"></i>${TIER_LABEL[k]}</span>`).join("")}</div>
+    <div class="chart ${showText ? "" : "dots"}" style="--sz:${sz}px">
+      ${shown.map(l => {
+        const m = [...l.chars].filter(c => t[c]).length;
+        return `<section><h3>${esc(l.label)} <small>${m} / ${l.chars.length}</small></h3>
+          <div class="cg">${[...l.chars].map(c => `<button class="ct k${t[c] || 0}" data-ct="${esc(c)}">${showText ? esc(c) : ""}</button>`).join("")}</div></section>`;
+      }).join("")}
+      ${chartZoom < max ? `<button class="btn ghost full more-levels" data-zoom="1">Zoom out to include ${esc(lv[chartZoom].label)} ›</button>` : ""}
+    </div>
+    <div class="muted small center pinch-hint">Pinch or use − / + to zoom</div></main>`;
+  bindHome(view());
+  const chart = $(".chart");
+  view().querySelectorAll("[data-zoom]").forEach(b => b.onclick = () => zoomChart(+b.dataset.zoom));
+  chart.onclick = e => {
+    const b = e.target.closest("[data-ct]"); if (!b) return;
+    const c = b.dataset.ct;
+    openSheet(D.chars[c] ? { type: "char", c } : { type: "preview", c });
+  };
+  pinchToZoom(chart);
+  window.scrollTo(0, chartScroll);
+}
+function zoomChart(dir) {
+  const next = chartZoom + dir;
+  if (next < 1 || next > (CL?.levels.length || 7)) return;
+  chartZoom = next; chartScroll = 0;
+  renderChart();
+}
+/** Two-finger pinch: spread fingers to zoom in (fewer levels, bigger tiles), pinch together to zoom out. */
+function pinchToZoom(el) {
+  let start = 0, done = false;
+  const dist = ts => Math.hypot(ts[0].clientX - ts[1].clientX, ts[0].clientY - ts[1].clientY);
+  el.addEventListener("touchstart", e => { if (e.touches.length === 2) { start = dist(e.touches); done = false; } }, { passive: true });
+  el.addEventListener("touchmove", e => {
+    if (e.touches.length !== 2 || !start) return;
+    e.preventDefault();
+    const r = dist(e.touches) / start;
+    if (!done && (r > 1.35 || r < 0.74)) { done = true; zoomChart(r > 1 ? -1 : 1); }
+  }, { passive: false });
+  el.addEventListener("touchend", () => { start = 0; });
+  ["gesturestart", "gesturechange"].forEach(n => el.addEventListener(n, e => e.preventDefault()));
+}
+function previewSheet(c) {
+  const [py, def, ex] = CL?.info?.[c] || [];
+  const lvl = CL?.levels.find(l => l.chars.includes(c));
+  return `<div class="hz big"><span>${esc(c)}</span></div>
+    ${py ? `<div class="py-line"><span class="py">${esc(py)}</span></div>` : ""}
+    <div class="meaning">${esc(def || "")}</div>
+    ${ex ? `<div class="center muted">as in <b class="hz-inline">${esc(ex)}</b></div>` : ""}
+    <div class="center" style="margin-top:12px"><span class="badge">${esc(lvl?.label || "")} · coming later</span></div>`;
+}
+
 /* ---------------- home / browse / settings / pad ---------------- */
 function bindHome(el) { el.querySelectorAll("[data-home]").forEach(b => b.onclick = () => { session = null; renderHome(); }); }
 
@@ -575,6 +738,7 @@ function renderHome() {
   const learned = Object.keys(S.introduced).length;
   view().innerHTML = `<main class="home">
     <h1>HSK Tutor</h1>
+    ${streakHTML()}
     <nav class="levels">${[1, 2, 3, 4, 5, 6].map(l => `<button class="level ${l === 1 ? "on" : ""}" ${l === 1 ? "" : "disabled"}>HSK ${l}${l === 1 ? "" : "<small>soon</small>"}</button>`).join("")}</nav>
     <section class="stats">
       <div><b>${due}</b><span>due</span></div>
@@ -583,6 +747,7 @@ function renderHome() {
     </section>
     <div class="progress"><div style="width:${(learned / total * 100).toFixed(1)}%"></div></div>
     <button class="btn primary full big" data-study ${due + left === 0 ? "disabled" : ""}>${due + left === 0 ? "Nothing due — come back later" : "Study"}</button>
+    ${homeChartHTML()}
     <div class="tiles">
       <button class="tile" data-go="pad">✍️<span>Writing pad</span></button>
       <button class="tile" data-go="browse">📚<span>Browse</span></button>
@@ -590,6 +755,7 @@ function renderHome() {
     </div>
   </main>`;
   $("[data-study]").onclick = startSession;
+  $("[data-chart]").onclick = () => { chartScroll = 0; renderChart(); };
   view().querySelectorAll("[data-go]").forEach(b => b.onclick = () => ({ pad: renderPad, browse: renderBrowse, settings: renderSettings })[b.dataset.go]());
 }
 

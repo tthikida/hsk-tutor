@@ -40,6 +40,24 @@ def sapi(num):
     return " ".join(f"{m.group(1)} {m.group(2) or '5'}" for m in re.finditer(r"([a-zv]+)([1-5])?", num))
 
 
+TONE_MARKS = {c: (base, t) for base, marks in {"a": "āáǎà", "e": "ēéěè", "i": "īíǐì", "o": "ōóǒò", "u": "ūúǔù", "ü": "ǖǘǚǜ"}.items()
+              for t, c in enumerate(marks, 1)}
+# readings to use for components whose dictionary entry lists another reading first
+CHAR_PY = {"宀": "mian2"}
+
+
+def marked_to_num(py):
+    """'jiōng' -> 'jiong1', 'men' -> 'men5'."""
+    tone, out = 5, ""
+    for ch in py.lower():
+        if ch in TONE_MARKS:
+            base, tone = TONE_MARKS[ch]
+            out += base
+        else:
+            out += ch
+    return out.replace("ü", "v") + str(tone)
+
+
 def ssml(voice, text, num=None, rate="-10%"):
     body = escape(text)
     if num:  # pin the HSK reading so polyphones (了, 地, 还, 行...) are read correctly in isolation
@@ -74,6 +92,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--test", action="store_true")
     ap.add_argument("--fast", action="store_true")
+    ap.add_argument("--chars", action="store_true", help="only single-character clips")
     args = ap.parse_args()
     key, region = load_env()
     data = json.load(open(os.path.join(APP, "data", "hsk1.json"), encoding="utf-8"))
@@ -89,6 +108,17 @@ def main():
         s = data["sentences"].get(w["id"])
         if s:
             jobs.append((key_for("s", w["id"]), s["zh"], None, "-5%"))
+    # single characters that aren't words themselves: components (冂, 亻...) and characters only seen inside words (们)
+    single_words = {w["s"] for w in data["words"]}
+    comp_order = [o["id"] for o in data["order"] if o["type"] != "word"]
+    other = [c for c in data["chars"] if c not in single_words and c not in comp_order]
+    for c in comp_order + other:
+        py = data["chars"].get(c, {}).get("py") or []
+        if c in single_words or not py:
+            continue
+        jobs.append((key_for("c", c), c, CHAR_PY.get(c) or marked_to_num(py[0]), "-10%"))
+    if args.chars:
+        jobs = [j for j in jobs if j[0].startswith("c_")]
     if args.test:
         jobs = [j for j in jobs if j[1] in ("了", "还", "你好")] + [j for j in jobs if j[0].startswith("s_")][:1]
 

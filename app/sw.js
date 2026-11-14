@@ -1,7 +1,7 @@
 // Offline support: app shell is precached; stroke data and audio are cached the first time they're used.
-const VERSION = "v2";
+const VERSION = "v5";
 const SHELL = ["./", "index.html", "styles.css", "js/app.js", "js/srs.js", "js/store.js",
-  "vendor/hanzi-writer.min.js", "data/hsk1.json", "manifest.webmanifest", "icon.svg", "icon-180.png"];
+  "vendor/hanzi-writer.min.js", "data/hsk1.json", "data/charlevels.json", "manifest.webmanifest", "icon.svg", "icon-180.png"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(`shell-${VERSION}`).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
