@@ -17,7 +17,13 @@ Flashcard app for HSK 3.0 vocabulary (Level 1 for now), built as a web app that 
 .venv/bin/python tools/build_data.py     # rebuild data after editing sentences or overrides
 .venv/bin/python tools/tts.py            # generate any missing audio (resumable)
 python3 -m http.server 8123 --directory app   # serve locally
+python3 tools/bump_version.py            # before pushing app-code changes: new ?v= stamp so phones load matching files
 ```
+
+## Sync
+Settings → Sync across devices stores progress in one private GitHub Gist (`hsk-tutor-progress.json`).
+Each device pastes a GitHub token with only the `gist` scope; the token stays in that device's browser.
+`js/sync.js` pulls, merges (newest review per card wins; days, log and introductions are unioned), and pushes.
 
 ## Card types
 Each word gets Read (字 → meaning), Write (meaning → draw 字), Listen (audio → meaning) and Tones cards,

@@ -1,5 +1,6 @@
-import { newCard, review, preview } from "./srs.js";
-import * as store from "./store.js";
+import { newCard, review, preview } from "./srs.js?v=8";
+import * as store from "./store.js?v=8";
+import * as sync from "./sync.js?v=8";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -131,7 +132,7 @@ function notesHTML(key) {
 }
 document.addEventListener("input", e => {
   const t = e.target.closest("[data-notes]");
-  if (t) { store.S().notes[t.dataset.notes] = t.value; store.save(); }
+  if (t) { const S = store.S(); S.notes[t.dataset.notes] = t.value; (S.notesAt ||= {})[t.dataset.notes] = Date.now(); store.save(); }
 });
 
 function answerHTML(key, { showHanzi = true } = {}) {
@@ -928,11 +929,13 @@ function renderSettings() {
       <option value="strict" ${s.writeMode === "strict" ? "selected" : ""}>Check each stroke</option>
       <option value="free" ${s.writeMode === "free" ? "selected" : ""}>Free draw, grade myself</option></select></label>
     <hr>
+    <div class="sync-box" data-sync></div>
+    <hr>
     <button class="btn" data-offline>Download all audio for offline use</button>
     <div class="row"><button class="btn ghost" data-export>Export progress</button>
     <label class="btn ghost">Import progress<input type="file" accept="application/json" data-import hidden></label></div>
     <button class="btn danger ghost" data-reset>Reset all progress</button>
-    <p class="muted small">Progress is saved on this device. Export a backup now and then. Vocabulary: HSK 3.0 Level 1 (complete-hsk-vocabulary, CC-CEDICT). Characters & strokes: Make Me a Hanzi. Voices: Azure neural TTS.</p>
+    <p class="muted small">Progress is saved on this device${sync.status().connected ? " and synced to your private GitHub Gist" : ""}. Export a backup now and then. Vocabulary: HSK 3.0 Level 1 (complete-hsk-vocabulary, CC-CEDICT). Characters & strokes: Make Me a Hanzi. Voices: Azure neural TTS.</p>
   </main>`;
   bindHome(view());
   view().querySelectorAll("[data-s]").forEach(inp => inp.onchange = () => {
@@ -949,7 +952,13 @@ function renderSettings() {
     try { store.importJSON(await e.target.files[0].text()); toast("Progress imported"); renderHome(); }
     catch (err) { toast(err.message); }
   };
-  $("[data-reset]").onclick = () => { if (confirm("Erase all progress on this device? This can't be undone.")) { store.resetAll(); renderHome(); } };
+  $("[data-reset]").onclick = () => {
+    const msg = sync.status().connected
+      ? "Erase progress on this device? Sync is on, so your cloud progress will download again. To start over everywhere, disconnect sync first and delete the gist on GitHub."
+      : "Erase all progress on this device? This can't be undone.";
+    if (confirm(msg)) { store.resetAll(); renderHome(); }
+  };
+  renderSyncBox();
   $("[data-offline]").onclick = async (e) => {
     const btn = e.target, urls = [];
     for (const [k, vs] of Object.entries(audioIndex)) for (const v of vs) urls.push(`audio/${v}/${k}.mp3`);
@@ -963,6 +972,44 @@ function renderSettings() {
   };
 }
 
+/* ---------------- cloud sync (private GitHub Gist) ---------------- */
+const TOKEN_URL = "https://github.com/settings/tokens/new?scopes=gist&description=HSK%20Tutor%20sync";
+function ago(t) {
+  const s = Math.round((Date.now() - t) / 1000);
+  return s < 60 ? "just now" : s < 3600 ? `${Math.round(s / 60)} min ago` : s < 86400 ? `${Math.round(s / 3600)} h ago` : `${Math.round(s / 86400)} d ago`;
+}
+function renderSyncBox() {
+  const box = $("[data-sync]"); if (!box) return;
+  const st = sync.status();
+  if (!st.connected) {
+    box.innerHTML = `<div class="label">Sync across devices</div>
+      <p class="muted small">Keeps your flashcards, streak and notes the same on every device, saved in a private gist on your GitHub account.
+      <br>1. <a href="${TOKEN_URL}" target="_blank" rel="noopener">Create a GitHub token</a> with only the <b>gist</b> box ticked.
+      <br>2. Paste it below. Do the same on each device (you can reuse the token).</p>
+      <input class="search" type="password" autocomplete="off" placeholder="Paste GitHub token" data-token>
+      <button class="btn primary" data-connect>Turn on sync</button>`;
+    $("[data-connect]", box).onclick = async e => {
+      const tok = $("[data-token]", box).value.trim();
+      if (!tok) return toast("Paste your token first");
+      e.target.disabled = true; e.target.textContent = "Connecting…";
+      try { await sync.connect(tok); toast("Sync is on ✓"); renderSyncBox(); }
+      catch (err) { toast(err.message); e.target.disabled = false; e.target.textContent = "Turn on sync"; }
+    };
+    return;
+  }
+  box.innerHTML = `<div class="label">Sync across devices</div>
+    <div class="sync-status ${st.error ? "err" : ""}">${st.busy ? "☁️ Syncing…" : st.error ? `⚠️ ${esc(st.error)}` : st.lastSync ? `☁️ Synced ${ago(st.lastSync)}` : "☁️ On"}</div>
+    <div class="row"><button class="btn ghost" data-syncnow>Sync now</button><button class="btn ghost danger" data-disconnect>Turn off</button></div>`;
+  $("[data-syncnow]", box).onclick = () => sync.syncNow().then(() => toast("Synced ✓")).catch(err => toast(err.message));
+  $("[data-disconnect]", box).onclick = () => {
+    if (confirm("Turn off sync on this device? Your progress stays here and in the gist; this device just stops syncing.")) { sync.disconnect(); renderSyncBox(); }
+  };
+}
+sync.onStatus(() => renderSyncBox());
+/** After a background sync brings in new progress, refresh the screen if it's safe (not mid-card). */
+function refreshAfterSync() { if ($(".home", view())) renderHome(); }
+function syncInBackground() { if (sync.status().connected) sync.syncNow().then(refreshAfterSync).catch(() => {}); }
+
 /* ---------------- boot ---------------- */
 async function boot() {
   D = await fetch("data/hsk1.json").then(r => r.json());
@@ -970,6 +1017,12 @@ async function boot() {
   D.words.forEach(w => { words[w.id] = w; });
   D.order.forEach((o, i) => { if (o.type === "comp") comps.add(o.id); ORDER_POS[o.id] = i; });
   renderHome();
+  store.onSave(() => sync.schedule());
+  syncInBackground();
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") syncInBackground();
+    else if (sync.pending()) sync.syncNow().catch(() => {});   // leaving the app: upload now instead of waiting
+  });
   if (navigator.storage?.persist) navigator.storage.persist();
   if ("serviceWorker" in navigator && location.protocol !== "file:") navigator.serviceWorker.register("sw.js");
 }

@@ -28,9 +28,20 @@ function load() {
   return blank();
 }
 
-export function save() {
+const listeners = [];
+/** Called after every save (used to trigger cloud sync). */
+export function onSave(fn) { listeners.push(fn); }
+
+export function save(silent = false) {
   try { localStorage.setItem(KEY, JSON.stringify(state)); }
   catch (e) { console.warn("could not save progress", e); }
+  if (!silent) listeners.forEach(fn => fn());
+}
+
+/** Swap in a whole state (e.g. merged with the cloud copy) without re-triggering sync. */
+export function replace(s) {
+  state = { ...blank(), ...s, settings: { ...DEFAULTS, ...s.settings } };
+  save(true);
 }
 
 export const S = () => state;

@@ -1,10 +1,11 @@
 // Offline support: app shell is precached; stroke data and audio are cached the first time they're used.
-const VERSION = "v6";
-const SHELL = ["./", "index.html", "styles.css", "js/app.js", "js/srs.js", "js/store.js",
+const VERSION = "v8";
+const SHELL = ["./", "index.html", "styles.css?v=8", "js/app.js?v=8", "js/srs.js?v=8", "js/store.js?v=8", "js/sync.js?v=8",
   "vendor/hanzi-writer.min.js", "data/hsk1.json", "data/charlevels.json", "manifest.webmanifest", "icon.svg", "icon-180.png"];
 
+// "reload"/"no-cache" make the worker check GitHub for new code instead of trusting the browser's HTTP cache
 self.addEventListener("install", e => {
-  e.waitUntil(caches.open(`shell-${VERSION}`).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(`shell-${VERSION}`).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: "reload" })))).then(() => self.skipWaiting()));
 });
 self.addEventListener("activate", e => {
   e.waitUntil(caches.keys().then(keys => Promise.all(
@@ -17,7 +18,7 @@ self.addEventListener("fetch", e => {
   const path = url.pathname;
   // the audio list changes while clips are being generated: network first
   if (path.endsWith("/audio/index.json")) {
-    e.respondWith(fetch(e.request).then(r => { const copy = r.clone(); caches.open("hsk-audio").then(c => c.put(e.request, copy)); return r; })
+    e.respondWith(fetch(e.request.url, { cache: "no-cache" }).then(r => { const copy = r.clone(); caches.open("hsk-audio").then(c => c.put(e.request, copy)); return r; })
       .catch(() => caches.match(e.request)));
     return;
   }
@@ -27,8 +28,8 @@ self.addEventListener("fetch", e => {
   e.respondWith((async () => {
     const cache = await caches.open(bucket);
     if (networkFirst) {
-      try { const r = await fetch(e.request); if (r.ok) cache.put(e.request, r.clone()); return r; }
-      catch { return (await cache.match(e.request)) || (await caches.match(e.request)); }
+      try { const r = await fetch(e.request.url, { cache: "no-cache" }); if (r.ok) cache.put(e.request, r.clone()); return r; }
+      catch { return (await cache.match(e.request)) || (await caches.match(e.request, { ignoreSearch: true })); }
     }
     const hit = await cache.match(e.request);
     if (hit) return hit;

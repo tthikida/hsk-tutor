@@ -261,3 +261,9 @@ pre { white-space: pre-wrap; }
 .drill-dots i { width: 9px; height: 9px; border-radius: 50%; }
 .drill-dots .good { background: var(--ok); } .drill-dots .ok { background: #e0a030; } .drill-dots .bad { background: var(--accent); }
 .drill-writer { display: flex; flex-direction: column; align-items: center; margin-top: 6px; }
+
+/* sync */
+.sync-box { display: flex; flex-direction: column; gap: 8px; }
+.sync-box a { color: var(--accent); }
+.sync-status { font-size: 15px; }
+.sync-status.err { color: var(--accent); }
