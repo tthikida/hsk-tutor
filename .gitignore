@@ -1,0 +1,6 @@
+.env
+raw/
+.DS_Store
+.venv/
+app/audio/samples/
+__pycache__/
