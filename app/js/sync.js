@@ -1,7 +1,7 @@
 // Sync progress across devices through one private GitHub Gist.
 // The token (gist permission only) is pasted by the user into Settings and kept on this device only.
 // Every sync = download the cloud copy, merge it with this device's progress, upload the result.
-import * as store from "./store.js?v=11";
+import * as store from "./store.js?v=12";
 
 const SKEY = "hsk-tutor-sync";            // {token, gistId, lastSync, lastError} — never exported or uploaded
 const FILE = "hsk-tutor-progress.json";
@@ -103,6 +103,14 @@ export function merge(local, remote) {
   // reminder subscriptions: one per device, newest change wins (so "off" on a device sticks)
   out.pushSubs = { ...(remote.pushSubs || {}) };
   for (const [k, v] of Object.entries(local.pushSubs || {})) if (!out.pushSubs[k] || (v.at || 0) >= (out.pushSubs[k].at || 0)) out.pushSubs[k] = v;
+
+  // handwriting test scores: keep the best ever, the most recent attempt and the total tries
+  out.tests = { ...(remote.tests || {}) };
+  for (const [c, v] of Object.entries(local.tests || {})) {
+    const r = out.tests[c];
+    out.tests[c] = !r ? v : { best: Math.max(v.best || 0, r.best || 0), n: Math.max(v.n || 0, r.n || 0),
+      ...((v.at || 0) >= (r.at || 0) ? { last: v.last, at: v.at } : { last: r.last, at: r.at }) };
+  }
 
   out.pintro = { ...(remote.pintro || {}) };
   for (const [k, t] of Object.entries(local.pintro || {})) out.pintro[k] = out.pintro[k] ? Math.min(+out.pintro[k], +t) : t;

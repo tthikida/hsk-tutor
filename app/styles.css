@@ -348,3 +348,19 @@ pre { white-space: pre-wrap; }
 @keyframes bao-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
 @keyframes bao-steam { 0% { opacity: 0; transform: translateY(6px); } 40% { opacity: .7; } 100% { opacity: 0; transform: translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) { .bao, .bao-steam path, .bao-blink { animation: none !important; } }
+
+/* handwriting test */
+.test { display: flex; flex-direction: column; align-items: center; }
+.test .drill-prompt { text-align: center; }
+.test [data-tinfo] { margin: 2px 0 8px; min-height: 18px; }
+.t-score { display: flex; align-items: baseline; justify-content: center; gap: 2px; margin-top: 14px; color: var(--c); }
+.t-score b { font-size: 56px; line-height: 1; font-variant-numeric: tabular-nums; }
+.t-score span { font-size: 18px; color: var(--muted); }
+.t-best { color: var(--ok); font-weight: 600; font-size: 14px; }
+.t-answer { font-size: 28px; margin-left: 8px; vertical-align: middle; }
+.t-stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; margin: 10px 0 4px; font-size: 14px; color: var(--muted); }
+.t-stats b { color: var(--ink); }
+.t-issues { margin: 6px auto 0; padding-left: 20px; font-size: 14px; max-width: 320px; }
+.t-issues li { margin: 2px 0; }
+.t-word { margin-top: 8px; }
+.t-anim { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; }

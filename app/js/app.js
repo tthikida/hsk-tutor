@@ -1,6 +1,7 @@
-import { newCard, review, preview } from "./srs.js?v=11";
-import * as store from "./store.js?v=11";
-import * as sync from "./sync.js?v=11";
+import { newCard, review, preview } from "./srs.js?v=12";
+import * as store from "./store.js?v=12";
+import * as sync from "./sync.js?v=12";
+import { gradeStrokes, verdict } from "./grade.js?v=12";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -336,6 +337,152 @@ function freePad(el) {
   cv.onpointermove = e => { if (drawing) { ctx.lineTo(...pos(e)); ctx.stroke(); } };
   cv.onpointerup = cv.onpointercancel = () => { drawing = false; };
   $("[data-clear]", el).onclick = () => ctx.clearRect(0, 0, cv.width, cv.height);
+}
+
+/* ---------------- handwriting test: freehand, no help, marked out of 100 ---------------- */
+const strokeData = {};
+const loadStrokes = c => strokeData[c] ??= fetch(`data/strokes/${c}.json`).then(r => r.json());
+
+/** Characters to test when none is typed in: ones you've met, else the first level-1 characters. */
+function testPool() {
+  const met = Object.keys(charTiers()).filter(hasStrokes);
+  return met.length >= 3 ? met : level1Chars().filter(hasStrokes).slice(0, 30);
+}
+function testRecord(c) { return (store.S().tests || {})[c]; }
+function saveTest(c, score, peeked) {
+  const S = store.S(); S.tests ||= {};
+  const r = S.tests[c] || { best: 0, n: 0 };
+  S.tests[c] = { best: peeked ? r.best : Math.max(r.best, score), last: score, n: r.n + 1, at: Date.now() };
+  markActive(); store.save(); updateBadge();
+}
+const scoreColor = s => s >= 0.75 ? "var(--ok)" : s >= 0.45 ? "var(--warn)" : "var(--accent)";
+
+/**
+ * Freehand test of one word or character. Nothing is snapped or drawn for you: you write it, then
+ * it's marked. `onNext` picks what to test after this one.
+ */
+function testPad(host, text, { onNext }) {
+  const chars = [...text].filter(hasStrokes);
+  let idx = 0;
+  const results = [];
+  const run = () => testChar(host, chars, idx, {
+    onDone: r => { results.push(r); },
+    onNextChar: () => { idx++; run(); },
+    onFinish: () => onNext(),
+    wordScores: results,
+  });
+  run();
+}
+
+function testChar(host, chars, idx, { onDone, onNextChar, onFinish, wordScores }) {
+  const c = chars[idx], word = chars.join(""), multi = chars.length > 1;
+  const size = writerSize(), W2 = size * 2, pad = Math.round(W2 * 0.06), s = (W2 - 2 * pad) / 1024;
+  const rec = testRecord(c);
+  host.innerHTML = `<div class="test">
+    ${multi ? `<div class="writer-progress">${chars.map((x, j) => `<span class="${j < idx ? "done" : j === idx ? "cur" : ""}">${j < idx ? esc(x) : "?"}</span>`).join("")}</div>` : ""}
+    <div class="drill-prompt">${drillPrompt(multi && idx === 0 ? word : c)} ${audioButtons(words[word] ? "w" : "c", multi ? word : c)}</div>
+    <div class="muted small center" data-tinfo>${multi ? `Character ${idx + 1} of ${chars.length} · ` : ""}${rec ? `Best ${rec.best} · ${rec.n} ${rec.n === 1 ? "try" : "tries"}` : "Write it from memory — no help, no snapping."}</div>
+    <div class="grid-box" style="width:${size}px;height:${size}px"><canvas width="${W2}" height="${W2}" style="width:${size}px;height:${size}px"></canvas></div>
+    <div class="row" data-tdraw>
+      <button class="btn ghost small" data-undo>↶ Undo</button><button class="btn ghost small" data-clear>Clear</button>
+      <button class="btn ghost small" data-peek>👀 Peek</button><button class="btn primary small" data-grade>Grade</button>
+    </div>
+    <div data-tresult></div>
+  </div>`;
+  const $t = q => host.querySelector(q);
+  const cv = $t("canvas"), ctx = cv.getContext("2d");
+  const ink = getComputedStyle(document.body).getPropertyValue("--ink").trim() || "#222";
+  const strokes = [];   // in canvas pixels
+  let cur = null, peeked = false, graded = false, data = null;
+  loadStrokes(c).then(d => data = d).catch(() => {});
+
+  const toBox = ([x, y]) => [(x - pad) / s, (y - pad) / s];
+  const line = (pts, color, width) => {
+    if (!pts.length) return;
+    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.moveTo(...pts[0]); pts.slice(1).forEach(p => ctx.lineTo(...p));
+    if (pts.length === 1) ctx.lineTo(pts[0][0] + 0.1, pts[0][1]);
+    ctx.stroke();
+  };
+  const drawModel = alpha => {
+    if (!data) return;
+    ctx.save(); ctx.globalAlpha = alpha; ctx.fillStyle = ink;
+    ctx.translate(pad, pad); ctx.scale(s, s); ctx.translate(0, 900); ctx.scale(1, -1);
+    data.strokes.forEach(p => ctx.fill(new Path2D(p)));
+    ctx.restore();
+  };
+  const redraw = () => { ctx.clearRect(0, 0, W2, W2); strokes.forEach(st => line(st, ink, 14)); };
+
+  const pos = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * W2 / r.width, (e.clientY - r.top) * W2 / r.height]; };
+  cv.onpointerdown = e => { if (graded) return; try { cv.setPointerCapture(e.pointerId); } catch {} cur = [pos(e)]; strokes.push(cur); redraw(); };
+  cv.onpointermove = e => { if (!cur) return; cur.push(pos(e)); line(cur.slice(-2), ink, 14); };
+  cv.onpointerup = cv.onpointercancel = () => { cur = null; };
+  $t("[data-undo]").onclick = () => { strokes.pop(); redraw(); };
+  $t("[data-clear]").onclick = () => { strokes.length = 0; redraw(); };
+  $t("[data-peek]").onclick = () => {
+    if (!data) return;
+    peeked = true; $t("[data-tinfo]").textContent = "Peeked — this attempt won't count toward your best.";
+    drawModel(0.35); setTimeout(() => { if (!graded) redraw(); }, 1200);
+  };
+
+  $t("[data-grade]").onclick = () => {
+    if (!data) return toast("Still loading…");
+    if (!strokes.length) return toast("Write the character first");
+    graded = true;
+    const r = gradeStrokes(strokes.map(st => st.map(toBox)), data.medians);
+    saveTest(c, r.score, peeked);
+    onDone(r.score);
+    // show: faint model underneath, your strokes coloured by how well each matched
+    ctx.clearRect(0, 0, W2, W2); drawModel(0.18);
+    strokes.forEach((st, j) => {
+      const sc = r.userScore[j];
+      line(st, sc == null ? getComputedStyle(document.body).getPropertyValue("--muted").trim() : resolveColor(scoreColor(sc)), 14);
+    });
+    $t("[data-tdraw]").hidden = true;
+    const issues = [];
+    r.strokes.forEach(x => {
+      const n = x.ref + 1;
+      if (x.missing) issues.push(`Stroke ${n} is missing`);
+      else {
+        if (x.outOfOrder) issues.push(`Stroke ${n} out of order — you wrote it ${ordinal(x.user + 1)}`);
+        if (x.backwards) issues.push(`Stroke ${n} drawn in the wrong direction`);
+        if (x.score < 0.45) issues.push(`Stroke ${n} is off in shape or position`);
+      }
+    });
+    if (r.extra.length) issues.push(`${r.extra.length} extra stroke${r.extra.length > 1 ? "s" : ""}`);
+    const prevBest = rec?.best ?? null;
+    const newBest = !peeked && r.score > 0 && (prevBest === null || r.score > prevBest);
+    const last = idx === chars.length - 1;
+    const wordAvg = multi && last ? Math.round(wordScores.reduce((a, b) => a + b, 0) / wordScores.length) : null;
+    $t("[data-tresult]").innerHTML = `
+      <div class="t-score" style="--c:${scoreColor(r.score / 100)}"><b>${r.score}</b><span>/100</span></div>
+      <div class="center"><b>${verdict(r.score)}</b>${peeked ? ` <span class="muted small">(peeked)</span>` : newBest && prevBest !== null ? ` <span class="t-best">New best!</span>` : ""}
+        <span class="hz-inline t-answer">${esc(c)}</span></div>
+      <div class="t-stats">
+        <span>Strokes <b>${r.expected - r.missing}/${r.expected}</b>${r.extra.length ? ` +${r.extra.length}` : ""}</span>
+        <span>Shape <b>${Math.round(r.shape * 100)}%</b></span>
+        <span>Order <b>${r.outOfOrder ? `${r.outOfOrder} off` : "✓"}</b></span>
+        <span>Direction <b>${r.backwards ? `${r.backwards} off` : "✓"}</b></span>
+      </div>
+      ${issues.length ? `<ul class="t-issues">${issues.slice(0, 5).map(i => `<li>${esc(i)}</li>`).join("")}</ul>` : `<div class="center muted small">No mistakes found 🎯</div>`}
+      ${wordAvg !== null ? `<div class="center t-word">${esc(word)} overall: <b>${wordAvg}</b>/100</div>` : ""}
+      <div class="anim-row t-anim" hidden></div>
+      <div class="row">
+        <button class="btn ghost small" data-watch>▶ Stroke order</button>
+        <button class="btn ghost small" data-retry>Try again</button>
+        <button class="btn primary small" data-next>${multi && !last ? "Next character →" : "Next →"}</button>
+      </div>`;
+    $t("[data-watch]").onclick = () => { const a = $t(".t-anim"); a.hidden = false; animateWord(a, c); };
+    $t("[data-retry]").onclick = () => { if (multi) wordScores.pop(); testChar(host, chars, idx, { onDone, onNextChar, onFinish, wordScores }); };
+    $t("[data-next]").onclick = () => multi && !last ? onNextChar() : onFinish();
+    ensureVisible($t(".t-score"));
+  };
+}
+const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] || "th");
+/** Canvas can't use CSS variables directly: resolve var(--x) to its value. */
+function resolveColor(v) {
+  const m = /^var\((--[\w-]+)\)$/.exec(v);
+  return m ? getComputedStyle(document.body).getPropertyValue(m[1]).trim() : v;
 }
 
 /* ---------------- sentence writing ---------------- */
@@ -1154,7 +1301,7 @@ function renderPad(kind = "char") {
   const tabs = `<div class="seg kind"><button data-kind="char" class="${kind === "char" ? "on" : ""}">字 Character</button><button data-kind="sent" class="${kind === "sent" ? "on" : ""}">句 Sentence</button></div>`;
   if (kind === "sent") return renderSentencePad(tabs);
   view().innerHTML = `${simpleHeader("Writing pad")}<main class="card">${tabs}
-    <div class="seg"><button data-mode="free" class="on">Free draw</button><button data-mode="trace">Trace</button><button data-mode="memory">From memory</button></div>
+    <div class="seg"><button data-mode="free" class="on">Free</button><button data-mode="trace">Trace</button><button data-mode="memory">Memory</button><button data-mode="test">Test ✓</button></div>
     <input class="search" placeholder="Search 字, pinyin or English (e.g. drink)" data-target autocomplete="off">
     <div class="pad-area"></div></main>`;
   bindHome(view()); bindKind();
@@ -1162,6 +1309,13 @@ function renderPad(kind = "char") {
   const area = $(".pad-area"), input = $("[data-target]");
   const go = () => {
     const t = [...input.value].filter(c => hasStrokes(c)).join("");
+    if (mode === "test") {
+      // a typed word/character is tested first; after that, random characters you've met
+      const pool = testPool();
+      const pick = () => { const p = pool.filter(c => c !== t); return p[Math.floor(Math.random() * p.length)] || pool[0]; };
+      const next = target => testPad(area, target, { onNext: () => { input.value = ""; next(pick()); } });
+      return next(t || pick());
+    }
     if (mode === "free" || !t) { freePad(area); if (mode !== "free" && !input.value) area.insertAdjacentHTML("afterbegin", `<div class="muted small center">Type a character above to ${mode === "trace" ? "trace it" : "write it from memory"}.</div>`); return; }
     quizWord(area, t, { outline: mode === "trace" }).then(r => { toast(r.mistakes ? `${r.mistakes} mistakes` : "Perfect!"); go(); });
   };
