@@ -1,8 +1,8 @@
-import { newCard, review, preview } from "./srs.js?v=16";
-import * as store from "./store.js?v=16";
-import * as sync from "./sync.js?v=16";
-import { gradeStrokes, verdict } from "./grade.js?v=16";
-import * as bao from "./bao.js?v=16";
+import { newCard, review, preview } from "./srs.js?v=17";
+import * as store from "./store.js?v=17";
+import * as sync from "./sync.js?v=17";
+import { gradeStrokes, verdict } from "./grade.js?v=17";
+import * as bao from "./bao.js?v=17";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -1060,6 +1060,11 @@ function renderHome() {
   const left = store.newLeftToday();
   const total = D.order.length;
   const learned = Object.keys(S.introduced).length;
+  // today's workload: cards reviewed since midnight vs. those plus what's still waiting (due + new)
+  const midnight = new Date().setHours(0, 0, 0, 0);
+  const doneToday = S.log.filter(([t, id]) => t >= midnight && !String(id).startsWith("p:")).length;
+  const todo = doneToday + due + Math.min(left, total - learned);
+  const pct = todo ? Math.floor(doneToday / todo * 100) : 100;
   view().innerHTML = `<main class="home">
     <h1>HSK Tutor</h1>
     ${mascotHTML()}
@@ -1070,7 +1075,10 @@ function renderHome() {
       <div><b>${Math.min(left, total - learned)}</b><span>new today</span></div>
       <div><b>${learned}</b><span>of ${total} learned</span></div>
     </section>
-    <div class="progress"><div style="width:${(learned / total * 100).toFixed(1)}%"></div></div>
+    <div class="today-bar">
+      <div class="today-label"><span>Today</span><span>${pct === 100 ? (doneToday ? `All done ✓ <b>${doneToday}</b> reviewed` : "Nothing to study") : `<b>${doneToday}</b> of <b>${todo}</b> done`}</span></div>
+      <div class="progress ${pct === 100 ? "full" : ""}" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="Today's study progress"><div style="width:${pct}%"></div></div>
+    </div>
     <button class="btn primary full big" data-study ${due + left === 0 ? "disabled" : ""}>${due + left === 0 ? "Nothing due — come back later" : "Study"}</button>
     ${homeChartHTML()}
     <div class="tiles">
