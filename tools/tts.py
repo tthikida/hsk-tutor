@@ -93,6 +93,7 @@ def main():
     ap.add_argument("--test", action="store_true")
     ap.add_argument("--fast", action="store_true")
     ap.add_argument("--chars", action="store_true", help="only single-character clips")
+    ap.add_argument("--pinyin", action="store_true", help="only pinyin syllable clips (pronunciation section)")
     args = ap.parse_args()
     key, region = load_env()
     data = json.load(open(os.path.join(APP, "data", "hsk1.json"), encoding="utf-8"))
@@ -119,18 +120,27 @@ def main():
         jobs.append((key_for("c", c), c, CHAR_PY.get(c) or marked_to_num(py[0]), "-10%"))
     if args.chars:
         jobs = [j for j in jobs if j[0].startswith("c_")]
+    if args.pinyin:
+        # pronunciation section: HSK 1 syllables in both voices first, then the rest of the chart (female voice)
+        p = json.load(open(os.path.join(APP, "data", "pinyin.json"), encoding="utf-8"))
+        first = set(p["hsk1"])
+        jobs = [(key_for("p", s), p["sample"].get(s, "啊"), s, "-10%") for s in p["hsk1"]]
+        jobs += [(key_for("p", s), ch, s, "-10%", ["f"]) for s, ch in p["sample"].items() if s not in first]
     if args.test:
         jobs = [j for j in jobs if j[1] in ("了", "还", "你好")] + [j for j in jobs if j[0].startswith("s_")][:1]
 
     index_path = os.path.join(APP, "audio", "index.json")
     index = json.load(open(index_path)) if os.path.exists(index_path) else {}
-    total = len(jobs) * len(VOICES)
+    total = sum(len(j[4]) if len(j) > 4 else len(VOICES) for j in jobs)
     done = 0
     for d in VOICES:
         os.makedirs(os.path.join(APP, "audio", d), exist_ok=True)
-    # both voices per item before moving on
-    for k, text, num, rate in jobs:
+    # both voices per item before moving on (or only the voices a job lists)
+    for job in jobs:
+        k, text, num, rate = job[:4]
         for vk, voice in VOICES.items():
+            if len(job) > 4 and vk not in job[4]:
+                continue
             done += 1
             out = os.path.join(APP, "audio", vk, k + ".mp3")
             if os.path.exists(out):

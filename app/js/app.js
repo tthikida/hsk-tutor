@@ -1,6 +1,6 @@
-import { newCard, review, preview } from "./srs.js?v=8";
-import * as store from "./store.js?v=8";
-import * as sync from "./sync.js?v=8";
+import { newCard, review, preview } from "./srs.js?v=9";
+import * as store from "./store.js?v=9";
+import * as sync from "./sync.js?v=9";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -340,8 +340,8 @@ function freePad(el) {
 const SENT_MODES = { trace: "Trace", pinyin: "Pinyin cue", dictation: "Dictation" };
 const SENT_HELP = {
   trace: "Outlines shown — copy the whole sentence stroke by stroke.",
-  pinyin: "Write each character from its pinyin. Characters you haven't learned yet still get an outline.",
-  dictation: "Listen and write. Pinyin shows only after each character is done.",
+  pinyin: "No outlines — write each character from its pinyin. Stuck? Tap Hint to see the outline.",
+  dictation: "No outlines — listen and write. Pinyin shows after each character. Hint shows the outline.",
 };
 function sentenceChars(wid) {
   const out = [];
@@ -386,7 +386,7 @@ function sentencePractice(el, wid, { mode = "pinyin", onNext = null } = {}) {
   const text = targets.map(k => all[k].c).join("");
   quizWord(wr, text, {
     progress: false, focus: wr,
-    outline: c => mode === "trace" || !charKnown(c),
+    outline: mode === "trace",
     onChar: drawStrip,
   }).then(({ mistakes }) => {
     wr.innerHTML = `<div class="sp-result">${mistakes ? `${mistakes} mistake${mistakes > 1 ? "s" : ""}` : "Perfect!"}</div>
@@ -403,7 +403,8 @@ let session = null;
 
 function allCards() { return store.S().cards; }
 function dueCards(now = Date.now()) {
-  return Object.entries(allCards()).filter(([, c]) => c.due <= now).map(([id]) => id);
+  // pronunciation cards (p:...) have their own session
+  return Object.entries(allCards()).filter(([id, c]) => c.due <= now && !id.startsWith("p:")).map(([id]) => id);
 }
 function nextNewItems(n) {
   const out = [];
@@ -493,6 +494,8 @@ function introduce(key) {
 }
 
 function nextCard() {
+  // the previous card scrolled down to its grade buttons; start every card at the top
+  window.scrollTo(0, 0);
   const item = session.q.shift();
   if (!item) return renderDone();
   if (item.kind === "intro") return renderIntro(item.key);
@@ -636,9 +639,9 @@ function renderSheet() {
   const e = sheetStack[sheetStack.length - 1];
   if (!e) return closeSheet();
   sh.hidden = false; document.body.classList.add("sheet-open");
-  const body = e.type === "char" ? charSheet(e.c) : e.type === "preview" ? previewSheet(e.c)
+  const body = e.type === "char" ? charSheet(e.c) : e.type === "preview" ? previewSheet(e.c) : e.type === "syl" ? sylSheet(e.s)
     : e.type === "sentence" ? `<div class="sp-host"></div>` : e.type === "drill" ? `<div class="drill-host"></div>` : itemSheet(e.key);
-  const crumb = x => x.type === "char" || x.type === "preview" ? x.c : x.type === "sentence" ? "✍️ sentence"
+  const crumb = x => x.type === "char" || x.type === "preview" ? x.c : x.type === "syl" ? marked(x.s) : x.type === "sentence" ? "✍️ sentence"
     : x.type === "drill" ? `✍️ ${x.text}` : x.key.slice(2);
   sh.innerHTML = `<div class="sheet-scrim" data-close></div><div class="sheet-panel">
     <div class="sheet-bar">${sheetStack.length > 1 ? `<button class="icon-btn" data-back aria-label="Back">‹</button>` : `<span></span>`}
@@ -828,17 +831,245 @@ function renderHome() {
     ${homeChartHTML()}
     <div class="tiles">
       <button class="tile" data-go="pad">✍️<span>Writing pad</span></button>
+      <button class="tile" data-go="pron">🗣️<span>Pronunciation</span></button>
       <button class="tile" data-go="browse">📚<span>Browse</span></button>
       <button class="tile" data-go="settings">⚙️<span>Settings</span></button>
     </div>
   </main>`;
   $("[data-study]").onclick = startSession;
   $("[data-chart]").onclick = () => { chartScroll = 0; renderChart(); };
-  view().querySelectorAll("[data-go]").forEach(b => b.onclick = () => ({ pad: renderPad, browse: renderBrowse, settings: renderSettings })[b.dataset.go]());
+  view().querySelectorAll("[data-go]").forEach(b => b.onclick = () => ({ pad: () => renderPad(), pron: () => renderPron(), browse: renderBrowse, settings: renderSettings })[b.dataset.go]());
 }
 
 function simpleHeader(title) {
   return `<header class="bar"><button class="icon-btn" data-home aria-label="Home">‹</button><div class="bar-title">${esc(title)}</div><span></span></header>`;
+}
+
+/* ---------------- pronunciation: tones, pinyin chart, sound flashcards ---------------- */
+let P = null, psession = null, pronTab = "practice";
+const loadPinyin = async () => P || (P = await fetch("data/pinyin.json").then(r => r.json()));
+const MARKS = { a: "āáǎà", e: "ēéěè", i: "īíǐì", o: "ōóǒò", u: "ūúǔù", v: "ǖǘǚǜ" };
+/** "lv3" -> "lǚ", "zhong1" -> "zhōng", "ma" (no tone) -> "ma" */
+function marked(id) {
+  const m = /^([a-zv]+)([1-5])?$/.exec(id); if (!m) return id;
+  let [, s, t] = m; t = +t || 5;
+  let at = -1;
+  if (t <= 4) {
+    if (s.includes("a")) at = s.indexOf("a"); else if (s.includes("e")) at = s.indexOf("e");
+    else if (s.includes("ou")) at = s.indexOf("o");
+    else for (let i = s.length - 1; i >= 0; i--) if ("iouv".includes(s[i])) { at = i; break; }
+  }
+  return [...s].map((c, i) => i === at ? MARKS[c][t - 1] : c === "v" ? "ü" : c).join("");
+}
+const sylTone = id => +id.slice(-1);
+const sylBase = id => id.replace(/[1-5]$/, "");
+const hasP = id => hasAudio("p", id);
+const TONES = [
+  { t: 1, name: "1st · high & level", how: "Hold one high, steady pitch, like singing a note.", ex: "ma1", word: "妈 mother", path: "M6 10 L54 10" },
+  { t: 2, name: "2nd · rising", how: "Rise from middle to high, like asking “huh?”", ex: "ma2", word: "麻 hemp", path: "M6 30 L54 8" },
+  { t: 3, name: "3rd · low dip", how: "Drop low and stay low; it only rises at the end of a phrase.", ex: "ma3", word: "马 horse", path: "M6 22 Q22 44 38 36 T54 14" },
+  { t: 4, name: "4th · falling", how: "Fall sharply from high to low, like a firm “No!”", ex: "ma4", word: "骂 scold", path: "M6 6 L54 40" },
+  { t: 5, name: "Neutral · light & short", how: "Unstressed and quick; its pitch depends on the tone before it.", ex: null, word: "吗 (question particle)", path: "M26 24 L34 24" },
+];
+const toneSVG = (path, t) => `<svg class="tone-svg t${t}" viewBox="0 0 60 46"><path d="M0 2H60M0 23H60M0 44H60" class="grid"/><path d="${path}" class="line"/></svg>`;
+
+function pronDue() {
+  const now = Date.now();
+  return Object.entries(allCards()).filter(([id, c]) => id.startsWith("p:") && c.due <= now).map(([id]) => id);
+}
+function pronNewLeft() {
+  const S = store.S(), d = store.today();
+  if (!S.pdaily || S.pdaily.date !== d) S.pdaily = { date: d, newCount: 0 };
+  return Math.max(0, (S.settings.pronNewPerDay ?? 10) - S.pdaily.newCount);
+}
+const pronLearned = () => Object.keys(store.S().pintro || {}).length;
+
+async function renderPron(tab = pronTab) {
+  pronTab = tab;
+  await loadPinyin();
+  const tabs = `<div class="seg">${[["practice", "Practice"], ["tones", "Tones"], ["chart", "Pinyin chart"]]
+    .map(([k, l]) => `<button data-ptab="${k}" class="${k === tab ? "on" : ""}">${l}</button>`).join("")}</div>`;
+  let body = "";
+  if (tab === "practice") {
+    const due = pronDue().length, left = Math.min(pronNewLeft(), P.hsk1.length - pronLearned());
+    body = `<p class="muted small">Train your ear on the ${P.hsk1.length} syllable + tone sounds used in HSK 1, starting with the most common.
+      Each sound gets two cards: <b>which tone?</b> and <b>which syllable?</b> (picked from look-alikes like zh/j/z or an/ang).</p>
+      <section class="stats"><div><b>${due}</b><span>due</span></div><div><b>${left}</b><span>new today</span></div>
+        <div><b>${pronLearned()}</b><span>of ${P.hsk1.length} sounds</span></div></section>
+      <button class="btn primary full big" data-pstart ${due + left ? "" : "disabled"}>${due + left ? "Practice sounds" : "All done — come back later"}</button>`;
+  } else if (tab === "tones") {
+    body = `<div class="tone-list">${TONES.map(x => `<div class="tone-row-card">
+        ${toneSVG(x.path, x.t)}
+        <div><b class="t${x.t}">${x.t === 5 ? "ma" : marked(x.ex)}</b> <span class="muted small">${esc(x.word)}</span>
+          <div class="small">${esc(x.name)}</div><div class="muted small">${esc(x.how)}</div></div>
+        <button class="icon-btn" ${x.ex ? `data-play="p|${x.ex}|"` : `data-play="w|吗|"`} aria-label="Play">🔊</button></div>`).join("")}</div>
+      <div class="label">Tone changes to know</div>
+      <ul class="tips">
+        <li><b>3 + 3 → 2 + 3.</b> Two 3rd tones in a row: the first becomes 2nd. 你好 nǐ hǎo is said <i>ní hǎo</i>.</li>
+        <li><b>不 bù → bú</b> before a 4th tone: 不是 <i>bú shì</i>.</li>
+        <li><b>一 yī</b> becomes <i>yí</i> before a 4th tone (一个 <i>yí ge</i>) and <i>yì</i> before other tones (一天 <i>yì tiān</i>).</li>
+        <li><b>3rd tone</b> before 1st, 2nd or 4th: just the low part, no rise (很好 hěn hǎo, 我们 wǒmen).</li>
+      </ul>`;
+  } else {
+    const ini = P.initials, fins = P.finals;
+    body = `<p class="muted small">Tap a syllable to hear its four tones. Rows are finals, columns are initials (first column: no initial, written with y/w). Scroll sideways for more.</p>
+      <div class="pchart-wrap"><table class="pchart"><thead><tr><th></th>${ini.map(i => `<th>${i || "∅"}</th>`).join("")}</tr></thead><tbody>
+      ${fins.map(f => `<tr><th>${f.replace(/v/g, "ü")}</th>${ini.map(i => {
+        const s = P.table[f]?.[i];
+        return s ? `<td><button data-syl="${s}" class="${P.hsk1.some(x => sylBase(x) === s) ? "hsk" : ""}">${marked(s)}</button></td>` : "<td></td>";
+      }).join("")}</tr>`).join("")}</tbody></table></div>
+      <div class="muted small"><span class="hsk-dot"></span> used in HSK 1</div>`;
+  }
+  view().innerHTML = `${simpleHeader("Pronunciation")}<main class="card pron">${tabs}${body}</main>`;
+  bindHome(view());
+  view().querySelectorAll("[data-ptab]").forEach(b => b.onclick = () => renderPron(b.dataset.ptab));
+  const st = $("[data-pstart]"); if (st) st.onclick = startPronSession;
+  view().querySelectorAll("[data-syl]").forEach(b => b.onclick = () => openSheet({ type: "syl", s: b.dataset.syl }));
+}
+function sylSheet(s) {
+  return `<div class="hz big"><span class="py-big">${marked(s)}</span></div>
+    <div class="tone-btns">${[1, 2, 3, 4].map(t => {
+      const id = s + t, ok = hasP(id);
+      return `<button class="tone-play t${t}" ${ok ? `data-play="p|${id}|"` : "disabled"}>${marked(id)}<small>${ok ? "🔊" : "—"}</small></button>`;
+    }).join("")}</div>
+    ${[1, 2, 3, 4].map(t => (P.examples[s + t] || []).length ? `<div class="py-ex"><b class="t${t}">${marked(s + t)}</b> ${P.examples[s + t]
+      .map(w => `<a href="#" class="chip" data-item="${esc(ik("w", w))}">${esc(w)}</a>`).join("")}</div>` : "").join("")}
+    <p class="muted small center">— means that tone isn't used in Mandarin for this syllable${Object.keys(P.sample).some(k => sylBase(k) === s && !hasP(k)) ? ", or its audio is still being recorded" : ""}.</p>`;
+}
+
+/* pronunciation session: new sounds are introduced, then quizzed by ear */
+const CONF_INI = [["zh", "z", "j"], ["ch", "c", "q"], ["sh", "s", "x"], ["n", "l", "r"], ["f", "h"], ["b", "p"], ["d", "t"], ["g", "k"], ["m", "n"]];
+const CONF_FIN = [["an", "ang"], ["en", "eng"], ["in", "ing"], ["ian", "iang"], ["uan", "uang"], ["un", "ong"], ["ie", "ian"], ["u", "v"], ["ou", "uo"], ["ei", "ai"], ["iu", "iao"], ["e", "o"]];
+function sylParts(s) {
+  for (const [f, row] of Object.entries(P.table)) for (const [i, v] of Object.entries(row)) if (v === s) return [i, f];
+  return ["", s];
+}
+function soundOptions(id) {
+  const t = sylTone(id), base = sylBase(id), [ini, fin] = sylParts(base);
+  const out = new Set();
+  const add = (i, f) => { const s = P.table[f]?.[i]; if (s && s !== base) out.add(s); };
+  for (const g of CONF_INI) if (g.includes(ini)) g.forEach(x => add(x, fin));
+  for (const g of CONF_FIN) if (g.includes(fin)) g.forEach(x => add(ini, x));
+  const pool = Object.values(P.table).flatMap(r => Object.values(r)).filter(s => s !== base && (s.startsWith(ini || s[0]) || s.endsWith(fin)));
+  while (out.size < 6 && pool.length) out.add(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  const picks = shuffle([...out]).slice(0, 3).map(s => s + t);
+  return shuffle([id, ...picks]);
+}
+function startPronSession() {
+  const due = shuffle(pronDue()).map(id => ({ kind: "pcard", id }));
+  const S = store.S(), intro = S.pintro || {};
+  const fresh = P.hsk1.filter(id => !intro[id] && hasP(id)).slice(0, pronNewLeft()).map(id => ({ kind: "pintro", id }));
+  const q = [];
+  while (due.length || fresh.length) { for (let k = 0; k < 3 && due.length; k++) q.push(due.shift()); if (fresh.length) q.push(fresh.shift()); }
+  if (!q.length) return toast("Nothing to practice right now — audio may still be downloading");
+  psession = { q, done: 0 };
+  nextPron();
+}
+function nextPron() {
+  window.scrollTo(0, 0);
+  const it = psession.q.shift();
+  if (!it) { psession = null; view().innerHTML = `<main class="card done"><div class="hz big">好</div><h2>Ears trained!</h2>${streakHTML()}
+      <button class="btn primary full" data-pback>Back to pronunciation</button></main>`; $("[data-pback]").onclick = () => renderPron("practice"); return; }
+  if (it.kind === "pintro") return pronIntro(it.id);
+  pronCard(it.id);
+}
+const pheader = title => `<header class="bar"><button class="icon-btn" data-pexit aria-label="Back">‹</button><div class="bar-title">${esc(title)}</div><div class="muted small">${psession.q.length + 1} left</div></header>`;
+function bindPexit() { $("[data-pexit]").onclick = () => { psession = null; renderPron("practice"); }; }
+function pronIntro(id) {
+  const ex = P.examples[id] || [];
+  view().innerHTML = `${pheader("New sound")}<main class="card intro">
+    <div class="badge new">new sound</div>
+    <div class="hz big"><span class="py-big t${sylTone(id)}">${marked(id)}</span></div>
+    <div class="center">${audioButtons("p", id)}</div>
+    <div class="center small">${esc(TONES[sylTone(id) - 1].name)} tone</div>
+    ${ex.length ? `<div class="py-ex center">in ${ex.map(w => `<a href="#" class="chip" data-item="${esc(ik("w", w))}">${esc(w)}</a>`).join("")}</div>` : ""}
+    <button class="btn primary full" data-gotit>Got it</button></main>`;
+  bindPexit();
+  play("p", id, null, true);
+  $("[data-gotit]").onclick = () => {
+    const S = store.S(), now = Date.now();
+    (S.pintro ||= {})[id] = now; S.pdaily.newCount++;
+    for (const f of ["tone", "sound"]) if (!S.cards[`p:${id}:${f}`]) S.cards[`p:${id}:${f}`] = newCard(now);
+    markActive(); store.save();
+    ["tone", "sound"].forEach((f, i) => psession.q.splice(Math.min(psession.q.length, 1 + i * 3), 0, { kind: "pcard", id: `p:${id}:${f}` }));
+    nextPron();
+  };
+}
+function pronCard(cid) {
+  const [, id, facet] = cid.split(":");
+  const options = facet === "tone" ? [1, 2, 3, 4].map(t => sylBase(id) + t) : soundOptions(id);
+  view().innerHTML = `${pheader(facet === "tone" ? "Which tone?" : "Which syllable?")}<main class="card pcard">
+    <button class="big-play" data-play="p|${id}|">🔊</button>
+    <div class="muted center">${facet === "tone" ? `Listen: is it ${marked(sylBase(id))} with tone 1, 2, 3 or 4?` : "Listen and pick what you heard"}</div>
+    <div class="p-opts ${facet}">${options.map(o => `<button class="p-opt ${facet === "tone" ? "t" + sylTone(o) : ""}" data-o="${o}">
+      ${facet === "tone" ? `${toneSVG(TONES[sylTone(o) - 1].path, sylTone(o))}<span>${marked(o)}</span>` : marked(o)}</button>`).join("")}</div>
+    <div class="p-feedback"></div></main>`;
+  bindPexit();
+  setTimeout(() => play("p", id), 200);
+  view().querySelectorAll("[data-o]").forEach(b => b.onclick = () => {
+    const right = b.dataset.o === id;
+    view().querySelectorAll("[data-o]").forEach(x => { x.disabled = true; if (x.dataset.o === id) x.classList.add("right"); });
+    if (!right) b.classList.add("wrong");
+    const S = store.S();
+    S.cards[cid] = review(S.cards[cid], right ? 3 : 1);
+    S.log.push([Date.now(), cid, right ? 3 : 1]); markActive(); store.save();
+    if (!right) psession.q.splice(Math.min(psession.q.length, 3), 0, { kind: "pcard", id: cid });
+    $(".p-feedback").innerHTML = `<div class="${right ? "ok" : "bad"}">${right ? "✓ Correct" : `It was <b>${marked(id)}</b>`}</div>
+      ${!right && facet === "sound" && hasP(b.dataset.o) ? `<button class="btn ghost small" data-play="p|${b.dataset.o}|">🔊 hear ${marked(b.dataset.o)}</button>` : ""}
+      <button class="btn primary full" data-pnext>Next</button>`;
+    if (right) play("p", id, null, true);
+    $("[data-pnext]").onclick = () => { psession.done++; nextPron(); };
+  });
+}
+
+/* ---------------- search by 字, pinyin or English ---------------- */
+const stripTones = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** Words and components matching a query, best first. Pinyin may be typed without tones ("nihao", "ni hao"). */
+function searchItems(q, { sentencesOnly = false, limit = 12 } = {}) {
+  q = q.trim();
+  if (!q) return [];
+  const ql = stripTones(q), qn = ql.replace(/\s+/g, ""), latin = /^[a-z\s'ü:-]+$/i.test(q);
+  const wordRe = latin ? new RegExp(`\\b${reEsc(ql)}\\b`, "i") : null;
+  const hits = [];
+  D.order.forEach((o, pos) => {
+    const isW = o.type === "word", id = o.id;
+    if (sentencesOnly && (!isW || !D.sentences[id])) return;
+    const w = words[id];
+    const py = stripTones(isW ? w.py : (D.chars[id]?.py || []).join(" ")).replace(/\s+/g, "");
+    const en = isW ? w.en : [D.chars[id]?.def || ""];
+    let score = 0;
+    if (!latin) score = id === q ? 100 : id.includes(q) ? 60 : 0;
+    else {
+      if (py === qn) score = 90;
+      else if (wordRe.test(en[0] || "")) score = 80;
+      else if (en.some(e => wordRe.test(e))) score = 70;
+      else if (qn.length >= 2 && py.startsWith(qn)) score = 50;
+      else if (ql.length >= 3 && en.some(e => e.toLowerCase().includes(ql))) score = 30;
+      if (score && !isW) score -= 5;   // prefer whole words over components
+    }
+    if (score) hits.push({ id, type: isW ? "w" : "c", score, pos });
+  });
+  return hits.sort((a, b) => b.score - a.score || a.pos - b.pos).slice(0, limit);
+}
+/** Show matches under an input as you type; tapping one (or Enter) picks it. */
+function attachSuggest(input, onPick, opts = {}) {
+  const box = h(`<div class="suggest" hidden></div>`);
+  input.after(box);
+  let hits = [];
+  const pick = hit => { input.value = hit.id; box.hidden = true; input.blur(); onPick(hit.id); };
+  input.addEventListener("input", () => {
+    hits = searchItems(input.value, opts);
+    box.hidden = !hits.length;
+    box.innerHTML = hits.map((x, i) => {
+      const w = words[x.id], c = D.chars[x.id] || {};
+      const py = x.type === "w" ? w.py : (c.py || [])[0] || "";
+      const en = x.type === "w" ? w.en[0] : c.def || "component";
+      return `<button class="sg" data-i="${i}"><span class="sg-hz">${esc(x.id)}</span><span class="sg-py">${esc(py)}</span><span class="sg-en">${esc(en)}</span></button>`;
+    }).join("");
+  });
+  box.addEventListener("click", e => { const b = e.target.closest("[data-i]"); if (b) pick(hits[+b.dataset.i]); });
+  input.addEventListener("keydown", e => { if (e.key === "Enter" && hits.length && /[a-z]/i.test(input.value)) { e.preventDefault(); pick(hits[0]); } });
 }
 
 function renderPad(kind = "char") {
@@ -846,7 +1077,7 @@ function renderPad(kind = "char") {
   if (kind === "sent") return renderSentencePad(tabs);
   view().innerHTML = `${simpleHeader("Writing pad")}<main class="card">${tabs}
     <div class="seg"><button data-mode="free" class="on">Free draw</button><button data-mode="trace">Trace</button><button data-mode="memory">From memory</button></div>
-    <input class="search" placeholder="Character or word to practice (e.g. 你好)" data-target>
+    <input class="search" placeholder="Search 字, pinyin or English (e.g. drink)" data-target autocomplete="off">
     <div class="pad-area"></div></main>`;
   bindHome(view()); bindKind();
   let mode = "free";
@@ -859,14 +1090,15 @@ function renderPad(kind = "char") {
   view().querySelectorAll("[data-mode]").forEach(b => b.onclick = () => {
     mode = b.dataset.mode; view().querySelectorAll("[data-mode]").forEach(x => x.classList.toggle("on", x === b)); go();
   });
-  input.onchange = go;
+  input.onchange = () => { if (!/[a-z]/i.test(input.value)) go(); };
+  attachSuggest(input, () => { if (mode === "free") $("[data-mode=trace]").click(); else go(); });
   go();
 }
 function bindKind() { view().querySelectorAll("[data-kind]").forEach(b => b.onclick = () => renderPad(b.dataset.kind)); }
 
 function renderSentencePad(tabs) {
   view().innerHTML = `${simpleHeader("Writing pad")}<main class="card">${tabs}
-    <input class="search" placeholder="Word to get its sentence (e.g. 喝), or random" data-sw>
+    <input class="search" placeholder="Find a word's sentence: 字, pinyin or English" data-sw autocomplete="off">
     <div class="muted small center sp-src"></div>
     <div class="sp-host"></div></main>`;
   bindHome(view()); bindKind();
@@ -879,9 +1111,11 @@ function renderSentencePad(tabs) {
   input.onchange = () => {
     const q = input.value.trim();
     if (!q) return start(randomOther());
+    if (/[a-z]/i.test(q)) return;   // English/pinyin goes through the suggestion list
     const hit = D.sentences[q] ? q : D.words.find(w => D.sentences[w.id] && (w.s === q || w.id.includes(q)))?.id;
     hit ? start(hit) : toast("No sentence for that word");
   };
+  attachSuggest(input, id => start(id), { sentencesOnly: true });
   start(randomOther());
 }
 
@@ -919,6 +1153,7 @@ function renderSettings() {
   const s = store.S().settings;
   view().innerHTML = `${simpleHeader("Settings")}<main class="card settings">
     <label>New items per day <input type="number" min="0" max="50" value="${s.newPerDay}" data-s="newPerDay"></label>
+    <label>New sounds per day <input type="number" min="0" max="50" value="${s.pronNewPerDay ?? 10}" data-s="pronNewPerDay"></label>
     <label>Voice <select data-s="voice">
       <option value="alt" ${s.voice === "alt" ? "selected" : ""}>Alternate female / male</option>
       <option value="f" ${s.voice === "f" ? "selected" : ""}>Female (Xiaoxiao)</option>

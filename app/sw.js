@@ -1,7 +1,7 @@
 // Offline support: app shell is precached; stroke data and audio are cached the first time they're used.
-const VERSION = "v8";
-const SHELL = ["./", "index.html", "styles.css?v=8", "js/app.js?v=8", "js/srs.js?v=8", "js/store.js?v=8", "js/sync.js?v=8",
-  "vendor/hanzi-writer.min.js", "data/hsk1.json", "data/charlevels.json", "manifest.webmanifest", "icon.svg", "icon-180.png"];
+const VERSION = "v9";
+const SHELL = ["./", "index.html", "styles.css?v=9", "js/app.js?v=9", "js/srs.js?v=9", "js/store.js?v=9", "js/sync.js?v=9",
+  "vendor/hanzi-writer.min.js", "data/hsk1.json", "data/charlevels.json", "data/pinyin.json", "manifest.webmanifest", "icon.svg", "icon-180.png"];
 
 // "reload"/"no-cache" make the worker check GitHub for new code instead of trusting the browser's HTTP cache
 self.addEventListener("install", e => {

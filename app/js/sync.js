@@ -1,7 +1,7 @@
 // Sync progress across devices through one private GitHub Gist.
 // The token (gist permission only) is pasted by the user into Settings and kept on this device only.
 // Every sync = download the cloud copy, merge it with this device's progress, upload the result.
-import * as store from "./store.js?v=8";
+import * as store from "./store.js?v=9";
 
 const SKEY = "hsk-tutor-sync";            // {token, gistId, lastSync, lastError} — never exported or uploaded
 const FILE = "hsk-tutor-progress.json";
@@ -99,6 +99,12 @@ export function merge(local, remote) {
 
   out.introduced = { ...(remote.introduced || {}) };
   for (const [k, t] of Object.entries(local.introduced || {})) out.introduced[k] = out.introduced[k] ? Math.min(+out.introduced[k] || +t, +t || +out.introduced[k]) : t;
+
+  out.pintro = { ...(remote.pintro || {}) };
+  for (const [k, t] of Object.entries(local.pintro || {})) out.pintro[k] = out.pintro[k] ? Math.min(+out.pintro[k], +t) : t;
+  const lp = local.pdaily || {}, rp = remote.pdaily || {};
+  out.pdaily = lp.date === rp.date ? { date: lp.date, newCount: Math.max(lp.newCount || 0, rp.newCount || 0) }
+    : dateVal(lp.date) >= dateVal(rp.date) ? lp : rp;
 
   out.notesAt = { ...(remote.notesAt || {}), ...(local.notesAt || {}) };
   out.notes = { ...(remote.notes || {}) };

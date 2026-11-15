@@ -267,3 +267,52 @@ pre { white-space: pre-wrap; }
 .sync-box a { color: var(--accent); }
 .sync-status { font-size: 15px; }
 .sync-status.err { color: var(--accent); }
+
+/* home: 4 tiles as a 2x2 grid */
+.tiles { grid-template-columns: repeat(2, 1fr); }
+
+/* search suggestions (writing pad) */
+.suggest { border: 1px solid var(--line); border-radius: 12px; background: var(--card); margin-top: 4px; max-height: 50vh; overflow-y: auto; }
+.suggest .sg { display: grid; grid-template-columns: auto auto 1fr; align-items: baseline; gap: 10px; width: 100%; padding: 10px 12px; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--ink); text-align: left; font: inherit; cursor: pointer; }
+.suggest .sg:last-child { border-bottom: 0; }
+.sg-hz { font-family: var(--hz-font); font-size: 22px; }
+.sg-py { color: var(--accent); font-size: 14px; }
+.sg-en { color: var(--muted); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* pronunciation */
+.pron .stats { margin-top: 6px; }
+.py-big { font-family: -apple-system, system-ui, sans-serif; font-size: 56px; font-weight: 600; letter-spacing: .02em; }
+.tone-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.tone-row-card { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; }
+.tone-row-card b { font-size: 22px; }
+.tone-svg { width: 60px; height: 46px; }
+.tone-svg .grid { stroke: var(--line); stroke-width: 1; fill: none; }
+.tone-svg .line { stroke: currentColor; stroke-width: 4; fill: none; stroke-linecap: round; }
+.tips { padding-left: 18px; margin: 6px 0 0; font-size: 14px; line-height: 1.5; }
+.tips li { margin-bottom: 6px; }
+.pchart-wrap { overflow: auto; max-height: 65vh; border: 1px solid var(--line); border-radius: 10px; margin: 8px 0; -webkit-overflow-scrolling: touch; }
+.pchart { border-collapse: separate; border-spacing: 0; font-size: 13px; }
+.pchart th { position: sticky; background: var(--card); color: var(--muted); font-weight: 600; padding: 4px 6px; z-index: 1; }
+.pchart thead th { top: 0; z-index: 2; }
+.pchart tbody th { left: 0; text-align: right; }
+.pchart thead th:first-child { left: 0; z-index: 3; }
+.pchart td { padding: 2px; border-top: 1px solid var(--line); }
+.pchart td button { min-width: 46px; padding: 6px 4px; border: 0; border-radius: 6px; background: var(--k0); color: var(--ink); font: inherit; cursor: pointer; }
+.pchart td button.hsk { background: color-mix(in srgb, var(--ok) 30%, var(--card)); }
+.hsk-dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: color-mix(in srgb, var(--ok) 30%, var(--card)); vertical-align: middle; }
+.tone-btns { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; }
+.tone-play { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); font-size: 20px; font-weight: 600; cursor: pointer; }
+.tone-play:disabled { opacity: .35; }
+.tone-play small { font-size: 12px; }
+.py-ex { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0; justify-content: center; }
+.py-ex .chip { font-family: var(--hz-font); }
+.pcard .big-play { margin: 10px auto; }
+.p-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0 8px; }
+.p-opt { padding: 16px 8px; border: 2px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink); font-size: 24px; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.p-opts.tone .p-opt { font-size: 20px; }
+.p-opt .tone-svg { width: 54px; height: 40px; }
+.p-opt.right { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 18%, var(--card)); }
+.p-opt.wrong { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, var(--card)); }
+.p-feedback { text-align: center; }
+.p-feedback .ok { color: var(--ok); font-weight: 700; font-size: 18px; margin: 6px 0; }
+.p-feedback .bad { color: var(--accent); font-size: 18px; margin: 6px 0; }
