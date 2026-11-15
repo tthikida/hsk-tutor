@@ -1,7 +1,7 @@
-import { newCard, review, preview } from "./srs.js?v=14";
-import * as store from "./store.js?v=14";
-import * as sync from "./sync.js?v=14";
-import { gradeStrokes, verdict } from "./grade.js?v=14";
+import { newCard, review, preview } from "./srs.js?v=15";
+import * as store from "./store.js?v=15";
+import * as sync from "./sync.js?v=15";
+import { gradeStrokes, verdict } from "./grade.js?v=15";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -1406,6 +1406,7 @@ function renderSettings() {
     <label class="btn ghost">Import progress<input type="file" accept="application/json" data-import hidden></label></div>
     <button class="btn danger ghost" data-reset>Reset all progress</button>
     <p class="muted small">Progress is saved on this device${sync.status().connected ? " and synced to your private GitHub Gist" : ""}. Export a backup now and then. Vocabulary: HSK 3.0 Level 1 (complete-hsk-vocabulary, CC-CEDICT). Characters & strokes: Make Me a Hanzi. Voices: Azure neural TTS.</p>
+    ${launchTimesHTML()}
   </main>`;
   bindHome(view());
   view().querySelectorAll("[data-s]").forEach(inp => inp.onchange = () => {
@@ -1547,6 +1548,32 @@ function syncInBackground() { if (sync.status().connected) sync.syncNow().then(r
 
 /* ---------------- boot ---------------- */
 const bootStatus = t => window.bootStatus?.(t);
+
+// How long the last few launches took, shown under Settings → Launch times. The clock starts when iOS
+// asks for the page, so time iOS spends before that (starting the app itself) isn't counted.
+const LAUNCH_KEY = "hsk-launches";
+function recordLaunch(ready) {
+  setTimeout(() => {   // the first-paint entry lands a moment after the paint itself
+    try {
+      const n = performance.getEntriesByType("navigation")[0] || {};
+      const fcp = performance.getEntriesByType("paint").find(p => p.name === "first-contentful-paint");
+      const L = JSON.parse(localStorage.getItem(LAUNCH_KEY) || "[]");
+      L.unshift({ at: Date.now(), page: n.responseEnd ? Math.round(n.responseEnd) : null, paint: fcp ? Math.round(fcp.startTime) : null,
+        ready: Math.round(ready), cached: !!navigator.serviceWorker?.controller, reload: n.type === "reload" });
+      localStorage.setItem(LAUNCH_KEY, JSON.stringify(L.slice(0, 6)));
+    } catch {}
+  }, 1500);
+}
+function launchTimesHTML() {
+  let L = [];
+  try { L = JSON.parse(localStorage.getItem(LAUNCH_KEY) || "[]"); } catch {}
+  if (!L.length) return "";
+  const s = ms => ms == null ? "?" : (ms / 1000).toFixed(2) + " s";
+  const rows = L.map(r => `<li>${new Date(r.at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}:
+    page ${s(r.page)}, first picture ${s(r.paint)}, ready ${s(r.ready)}${r.cached ? "" : " (not from the phone's copy)"}${r.reload ? " (reload after update)" : ""}</li>`).join("");
+  return `<details class="muted small"><summary>Launch times</summary><ul>${rows}</ul>
+    <p>Counted from when iOS asks for the page. Time iOS spends before that isn't included.</p></details>`;
+}
 async function boot() {
   bootStatus("Fetching the word list…");
   // all three at once rather than one after another
@@ -1560,6 +1587,7 @@ async function boot() {
   D.order.forEach((o, i) => { if (o.type === "comp") comps.add(o.id); ORDER_POS[o.id] = i; });
   renderHome();
   window.bootDone?.();
+  recordLaunch(performance.now());
   store.onSave(() => sync.schedule());
   syncInBackground();
   document.addEventListener("visibilitychange", () => {
