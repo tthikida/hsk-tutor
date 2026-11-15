@@ -12,12 +12,107 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-180.png">
-  <link rel="stylesheet" href="styles.css?v=12">
-  <script src="vendor/hanzi-writer.min.js"></script>
+  <!-- loading screen styles live here so it can draw before anything else arrives -->
+  <style>
+    #boot { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 10px; padding: 24px 16px; background: #f7f4ef; color: #1f1d1a; overflow: hidden; transition: opacity .35s ease;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; -webkit-user-select: none; user-select: none; }
+    #boot.done { opacity: 0; pointer-events: none; }
+    #boot .drift { position: absolute; bottom: -60px; font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif; color: #b8322c;
+      opacity: 0; animation: boot-drift linear infinite; pointer-events: none; }
+    #boot .hop { position: relative; z-index: 1; animation: boot-hop .9s cubic-bezier(.3,0,.5,1) infinite alternate; }
+    #boot .hop svg { width: 110px; height: 92px; overflow: visible; transform-origin: 50% 92%; animation: boot-squash .9s ease-in-out infinite alternate; }
+    #boot .shadow { width: 80px; height: 10px; border-radius: 50%; background: rgba(0,0,0,.12); margin-top: -6px; animation: boot-shadow .9s cubic-bezier(.3,0,.5,1) infinite alternate; }
+    #boot .steam path { fill: none; stroke: #a39c92; stroke-width: 2.5; stroke-linecap: round; animation: boot-steam 1.8s ease-in-out infinite; }
+    #boot .steam path:nth-child(2) { animation-delay: .6s; } #boot .steam path:nth-child(3) { animation-delay: 1.2s; }
+    #boot .word { position: relative; z-index: 1; margin-top: 18px; min-width: 210px; padding: 16px 22px 12px; border-radius: 16px; text-align: center;
+      background: #fff; border: 1px solid #e6e0d6; cursor: pointer; transition: transform .15s; }
+    #boot .word:active { transform: scale(.97); }
+    #boot .word .k { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #7a746b; }
+    #boot .word .hz { font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif; font-size: 46px; line-height: 1.2; margin-top: 4px; }
+    #boot .word .py { font-size: 17px; color: #b8322c; }
+    #boot .word .en { font-size: 15px; color: #7a746b; margin-top: 2px; }
+    #boot .word .swap { animation: boot-in .35s ease-out; }
+    #boot .word .tap { font-size: 11px; color: #a39c92; margin-top: 8px; }
+    #boot .bar { position: relative; z-index: 1; width: 180px; height: 5px; border-radius: 3px; background: #e6e0d6; overflow: hidden; margin-top: 14px; }
+    #boot .bar i { position: absolute; top: 0; bottom: 0; width: 40%; border-radius: 3px; background: #b8322c; animation: boot-bar 1.2s ease-in-out infinite; }
+    #boot .status { position: relative; z-index: 1; font-size: 13px; color: #7a746b; min-height: 1.3em; margin: 0; text-align: center; }
+    @keyframes boot-hop { from { transform: translateY(0); } to { transform: translateY(-34px); } }
+    @keyframes boot-squash { 0% { transform: scale(1.12, .86); } 25% { transform: scale(.95, 1.06); } 100% { transform: scale(1, 1); } }
+    @keyframes boot-shadow { from { transform: scale(1); opacity: 1; } to { transform: scale(.6); opacity: .5; } }
+    @keyframes boot-steam { 0% { opacity: 0; transform: translateY(6px); } 40% { opacity: .7; } 100% { opacity: 0; transform: translateY(-10px); } }
+    @keyframes boot-drift { 0% { transform: translateY(0) rotate(-8deg); opacity: 0; } 15% { opacity: var(--o); } 85% { opacity: var(--o); }
+      100% { transform: translateY(calc(-100vh - 120px)) rotate(10deg); opacity: 0; } }
+    @keyframes boot-bar { 0% { left: -40%; } 100% { left: 100%; } }
+    @keyframes boot-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @media (prefers-color-scheme: dark) {
+      #boot { background: #161514; color: #f2eee8; }
+      #boot .word { background: #22201e; border-color: #3a3632; }
+      #boot .word .py, #boot .drift { color: #e0574f; }
+      #boot .bar { background: #3a3632; } #boot .bar i { background: #e0574f; }
+      #boot .shadow { background: rgba(0,0,0,.45); }
+    }
+    @media (prefers-reduced-motion: reduce) { #boot *, #boot .hop svg { animation: none !important; } }
+  </style>
+  <link rel="stylesheet" href="styles.css?v=13">
+  <script src="vendor/hanzi-writer.min.js" defer></script>
 </head>
 <body>
-  <div id="view"><main class="card"><p class="muted center">Loading…</p></main></div>
+  <div id="boot" role="status" aria-live="polite">
+    <div class="hop"><svg viewBox="0 0 120 100" aria-hidden="true">
+      <g class="steam"><path d="M48 14q-5-6 0-12"/><path d="M60 10q-5-6 0-12"/><path d="M72 14q-5-6 0-12"/></g>
+      <path d="M14 82q-6-30 22-48q12-12 24-14q12 2 24 14q28 18 22 48q-2 10-46 10t-46-10z" fill="#f7ead6" stroke="#d8b88c" stroke-width="2"/>
+      <path d="M60 20q-4 10-14 14M60 20q4 10 14 14M60 20v12M60 20q-12 4-22 12M60 20q12 4 22 12" fill="none" stroke="#d8b88c" stroke-width="1.6" stroke-linecap="round"/>
+      <ellipse cx="34" cy="70" rx="6" ry="3.5" fill="#f2a7a0" opacity=".7"/><ellipse cx="86" cy="70" rx="6" ry="3.5" fill="#f2a7a0" opacity=".7"/>
+      <path d="M38 61q6-7 12 0M70 61q6-7 12 0M51 73q9 8 18 0" fill="none" stroke="#3a2a20" stroke-width="3" stroke-linecap="round"/>
+    </svg></div>
+    <div class="shadow"></div>
+    <div class="word" id="boot-word" title="Tap for another word">
+      <div class="k">A word while you wait</div>
+      <div id="boot-w"></div>
+      <div class="tap">tap for another</div>
+    </div>
+    <div class="bar"><i></i></div>
+    <p class="status" id="boot-status">Steaming the buns…</p>
+  </div>
+  <script>
+    (function () {
+      var W = [["你好","nǐ hǎo","hello"],["谢谢","xièxie","thank you"],["包子","bāozi","steamed bun (that's Bao!)"],["朋友","péngyou","friend"],
+        ["喜欢","xǐhuan","to like"],["老师","lǎoshī","teacher"],["学生","xuésheng","student"],["中国","Zhōngguó","China"],["再见","zàijiàn","goodbye"],
+        ["今天","jīntiān","today"],["明天","míngtiān","tomorrow"],["吃饭","chī fàn","to eat a meal"],["喝茶","hē chá","to drink tea"],["水","shuǐ","water"],
+        ["猫","māo","cat"],["狗","gǒu","dog"],["书","shū","book"],["家","jiā","home, family"],["苹果","píngguǒ","apple"],["米饭","mǐfàn","cooked rice"],
+        ["睡觉","shuìjiào","to sleep"],["爱","ài","to love"],["大","dà","big"],["小","xiǎo","small"],["好吃","hǎochī","tasty"],["学习","xuéxí","to study"]];
+      var box = document.getElementById("boot-w"), i = Math.floor(Math.random() * W.length), timer;
+      function show() {
+        var w = W[i % W.length]; i++;
+        box.innerHTML = '<div class="swap"><div class="hz">' + w[0] + '</div><div class="py">' + w[1] + '</div><div class="en">' + w[2] + '</div></div>';
+        clearTimeout(timer); timer = setTimeout(show, 2600);
+      }
+      show();
+      document.getElementById("boot-word").addEventListener("click", show);
+      // characters drifting up the background
+      var boot = document.getElementById("boot"), C = "你好学中文爱书水火山月日人大小口心天".split("");
+      for (var n = 0; n < 14; n++) {
+        var s = document.createElement("span");
+        s.className = "drift"; s.textContent = C[n % C.length];
+        s.style.left = (4 + Math.random() * 88) + "%";
+        s.style.fontSize = (22 + Math.random() * 34) + "px";
+        s.style.setProperty("--o", (0.08 + Math.random() * 0.14).toFixed(2));
+        s.style.animationDuration = (7 + Math.random() * 7) + "s";
+        s.style.animationDelay = (-Math.random() * 12) + "s";
+        boot.insertBefore(s, boot.firstChild);
+      }
+      // called by the app as it loads, and once it's ready
+      window.bootStatus = function (t) { var el = document.getElementById("boot-status"); if (el) el.textContent = t; };
+      window.bootDone = function () {
+        clearTimeout(timer); boot.classList.add("done");
+        setTimeout(function () { if (boot.parentNode) boot.parentNode.removeChild(boot); }, 400);
+      };
+      setTimeout(function () { if (boot.parentNode) window.bootStatus("Still going… a slow connection makes this take longer."); }, 12000);
+    })();
+  </script>
+  <div id="view"></div>
   <div id="sheet" hidden></div>
-  <script type="module" src="js/app.js?v=12"></script>
+  <script type="module" src="js/app.js?v=13"></script>
 </body>
 </html>

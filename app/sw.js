@@ -1,6 +1,6 @@
 // Offline support: app shell is precached; stroke data and audio are cached the first time they're used.
-const VERSION = "v12";
-const SHELL = ["./", "index.html", "styles.css?v=12", "js/app.js?v=12", "js/srs.js?v=12", "js/store.js?v=12", "js/sync.js?v=12", "js/grade.js?v=12",
+const VERSION = "v13";
+const SHELL = ["./", "index.html", "styles.css?v=13", "js/app.js?v=13", "js/srs.js?v=13", "js/store.js?v=13", "js/sync.js?v=13", "js/grade.js?v=13",
   "vendor/hanzi-writer.min.js", "data/hsk1.json", "data/charlevels.json", "data/pinyin.json", "data/mascot.json", "manifest.webmanifest", "icon.svg", "icon-180.png"];
 
 // "reload"/"no-cache" make the worker check GitHub for new code instead of trusting the browser's HTTP cache
@@ -25,12 +25,19 @@ self.addEventListener("fetch", e => {
   const bucket = path.includes("/audio/") ? "hsk-audio" : path.includes("/data/strokes/") ? "hsk-strokes" : `shell-${VERSION}`;
   // app code: network first so updates show up; everything else: cache first
   const networkFirst = bucket.startsWith("shell-");
+  if (networkFirst) {
+    // Network first, but don't wait on a slow connection: after a moment use the cached copy of this exact
+    // file (same ?v= stamp, so versions never mix) while the download carries on and refreshes the cache.
+    const net = caches.open(bucket).then(cache => fetch(e.request.url, { cache: "no-cache" })
+      .then(r => { if (r.ok) cache.put(e.request, r.clone()); return r; }));
+    e.waitUntil(net.catch(() => {}));
+    const slow = new Promise(res => setTimeout(res, 1500)).then(() => caches.match(e.request)).then(hit => hit || net);
+    e.respondWith(Promise.race([net, slow]).catch(async () =>
+      (await caches.match(e.request)) || (await caches.match(e.request, { ignoreSearch: true })) || Response.error()));
+    return;
+  }
   e.respondWith((async () => {
     const cache = await caches.open(bucket);
-    if (networkFirst) {
-      try { const r = await fetch(e.request.url, { cache: "no-cache" }); if (r.ok) cache.put(e.request, r.clone()); return r; }
-      catch { return (await cache.match(e.request)) || (await caches.match(e.request, { ignoreSearch: true })); }
-    }
     const hit = await cache.match(e.request);
     if (hit) return hit;
     const r = await fetch(e.request);

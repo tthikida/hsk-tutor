@@ -1,7 +1,7 @@
-import { newCard, review, preview } from "./srs.js?v=12";
-import * as store from "./store.js?v=12";
-import * as sync from "./sync.js?v=12";
-import { gradeStrokes, verdict } from "./grade.js?v=12";
+import { newCard, review, preview } from "./srs.js?v=13";
+import * as store from "./store.js?v=13";
+import * as sync from "./sync.js?v=13";
+import { gradeStrokes, verdict } from "./grade.js?v=13";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -1546,13 +1546,18 @@ function refreshAfterSync() { if ($(".home", view())) renderHome(); }
 function syncInBackground() { if (sync.status().connected) sync.syncNow().then(refreshAfterSync).catch(() => {}); }
 
 /* ---------------- boot ---------------- */
+const bootStatus = t => window.bootStatus?.(t);
 async function boot() {
+  bootStatus("Fetching the word list…");
   D = await fetch("data/hsk1.json").then(r => r.json());
+  bootStatus("Tuning the voices…");
   try { audioIndex = await fetch("audio/index.json", { cache: "no-cache" }).then(r => r.ok ? r.json() : {}); } catch { audioIndex = {}; }
   D.words.forEach(w => { words[w.id] = w; });
   D.order.forEach((o, i) => { if (o.type === "comp") comps.add(o.id); ORDER_POS[o.id] = i; });
+  bootStatus("Waking Bao…");
   await loadMascot();
   renderHome();
+  window.bootDone?.();
   store.onSave(() => sync.schedule());
   syncInBackground();
   document.addEventListener("visibilitychange", () => {
@@ -1562,4 +1567,4 @@ async function boot() {
   if (navigator.storage?.persist) navigator.storage.persist();
   if ("serviceWorker" in navigator && location.protocol !== "file:") navigator.serviceWorker.register("sw.js");
 }
-boot().catch(e => { view().innerHTML = `<main class="card"><p>Couldn't load the app data.</p><pre>${esc(e.message)}</pre></main>`; });
+boot().catch(e => { window.bootDone?.(); view().innerHTML = `<main class="card"><p>Couldn't load the app data.</p><pre>${esc(e.message)}</pre></main>`; });
