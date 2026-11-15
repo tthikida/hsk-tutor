@@ -1,0 +1,27 @@
+name: Bao study reminders
+on:
+  schedule:
+    - cron: "2 * * * *"     # every hour; the script decides per device whether it's reminder time
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Send a reminder now to every device (test)"
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-save web-push@3.6.7
+      - run: node tools/remind.mjs
+        env:
+          GIST_ID: ${{ secrets.GIST_ID }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_PUBLIC_KEY: BMMNJFV5OZb_fk_acDIUTU50EFgD1wNMe8d6VoBrf99SWbovhz5Zjb12Eym9avsTd4wfHNPBwJK2bA8EaK_bepk
+          FORCE: ${{ inputs.force && '1' || '' }}

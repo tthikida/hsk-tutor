@@ -1,6 +1,6 @@
-import { newCard, review, preview } from "./srs.js?v=9";
-import * as store from "./store.js?v=9";
-import * as sync from "./sync.js?v=9";
+import { newCard, review, preview } from "./srs.js?v=10";
+import * as store from "./store.js?v=10";
+import * as sync from "./sync.js?v=10";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -474,6 +474,79 @@ function streakHTML() {
   </section>`;
 }
 
+/* ---------------- Bao, the mascot ---------------- */
+let M = null;
+const loadMascot = async () => M || (M = await fetch("data/mascot.json").then(r => r.json()).catch(() => null));
+const pick = a => a[Math.floor(Math.random() * a.length)];
+/** Days missed since the last study day (0 = studied today or yesterday). */
+function daysMissed() {
+  const keys = Object.keys(activityDays()).sort();
+  if (!keys.length) return -1;
+  const [y, m, d] = keys[keys.length - 1].split("-").map(Number);
+  const now = new Date(), today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.max(0, Math.round((today - new Date(y, m - 1, d)) / 86400000) - 1);
+}
+function mascotState() {
+  const { n, todayDone } = streakInfo(), missed = daysMissed();
+  if (missed < 0) return { pool: "fresh", mood: "neutral", n, missed: 0 };
+  if (todayDone) return { pool: n >= 3 && Math.random() < 0.4 ? "streak" : "done", mood: n >= 7 ? "ecstatic" : "happy", n, missed };
+  if (missed === 0) return { pool: "pending", mood: "neutral", n, missed };
+  return { pool: missed >= 7 ? "missed7" : missed >= 3 ? "missed3" : "missed1", mood: missed >= 3 ? "furious" : "annoyed", n, missed };
+}
+function fillLine(s, st) {
+  const due = dueCards().length + pronDue().length;
+  return s.replace(/\{streak\}/g, st.n).replace(/\{due\}/g, due).replace(/\{days\}/g, st.missed).replace(/\{hour\}/g, new Date().getHours() + ":00");
+}
+function baoSVG(mood) {
+  const eyes = {
+    ecstatic: `<path d="M38 60q6-8 12 0M70 60q6-8 12 0" class="bao-line"/>`,
+    happy: `<path d="M38 61q6-7 12 0M70 61q6-7 12 0" class="bao-line"/>`,
+    neutral: `<g class="bao-blink"><circle cx="44" cy="60" r="4.5"/><circle cx="76" cy="60" r="4.5"/></g>`,
+    annoyed: `<circle cx="44" cy="62" r="4"/><circle cx="76" cy="62" r="4"/><path d="M37 58h14M69 58h14" class="bao-line"/>`,
+    furious: `<circle cx="44" cy="63" r="4"/><circle cx="76" cy="63" r="4"/><path d="M36 53l14 6M84 53l-14 6" class="bao-line"/>`,
+  }[mood];
+  const mouth = {
+    ecstatic: `<path d="M50 72q10 14 20 0z" class="bao-mouth"/>`,
+    happy: `<path d="M51 73q9 8 18 0" class="bao-line"/>`,
+    neutral: `<path d="M54 74q6 4 12 0" class="bao-line"/>`,
+    annoyed: `<path d="M53 76h14" class="bao-line"/>`,
+    furious: `<path d="M51 79q9-9 18 0" class="bao-line"/>`,
+  }[mood];
+  const extra = {
+    ecstatic: `<g class="bao-steam"><path d="M46 14q-5-6 0-12M60 10q-5-6 0-12M74 14q-5-6 0-12"/></g>`,
+    happy: `<g class="bao-steam"><path d="M52 14q-5-6 0-12M68 14q-5-6 0-12"/></g>`,
+    neutral: "",
+    annoyed: `<path d="M92 40q4 8 0 10q-4-2 0-10z" class="bao-sweat"/>`,
+    furious: `<path d="M86 30l6 6M92 30l-6 6M89 27v12M83 33h12" class="bao-vein"/>`,
+  }[mood];
+  return `<svg class="bao bao-${mood}" viewBox="0 0 120 100" aria-hidden="true">${extra}
+    <path d="M14 82q-6-30 22-48q12-12 24-14q12 2 24 14q28 18 22 48q-2 10-46 10t-46-10z" class="bao-body"/>
+    <path d="M60 20q-4 10-14 14M60 20q4 10 14 14M60 20v12M60 20q-12 4-22 12M60 20q12 4 22 12" class="bao-pleat"/>
+    <ellipse cx="34" cy="70" rx="6" ry="3.5" class="bao-cheek"/><ellipse cx="86" cy="70" rx="6" ry="3.5" class="bao-cheek"/>
+    <g class="bao-face">${eyes}${mouth}</g></svg>`;
+}
+/** Bao with a speech bubble. pool overrides the automatic choice (e.g. "session"). */
+function mascotHTML(pool) {
+  if (!M || store.S().settings.mascot === false) return "";
+  const st = mascotState();
+  const line = fillLine(pick(M.lines[pool || st.pool] || M.lines.done), st);
+  return `<section class="mascot" data-mascot="${pool || ""}">${baoSVG(pool === "session" ? "happy" : st.mood)}
+    <div class="bubble"><b>${esc(M.name)}</b><span>${esc(line)}</span></div></section>`;
+}
+document.addEventListener("click", e => {
+  const m = e.target.closest(".mascot");
+  if (!m) return;
+  const fresh = h(mascotHTML(m.dataset.mascot || undefined));
+  if (fresh) { fresh.classList.add("bounce"); m.replaceWith(fresh); }
+});
+/** Red number on the home-screen icon = cards due (vocabulary + sounds). */
+function updateBadge() {
+  try {
+    const n = dueCards().length + pronDue().length;
+    if (navigator.setAppBadge) n ? navigator.setAppBadge(n) : navigator.clearAppBadge();
+  } catch {}
+}
+
 function introduce(key) {
   const S = store.S(), now = Date.now(), type = key[0], id = key.slice(2);
   S.introduced[key] = now;
@@ -625,6 +698,7 @@ function renderDone() {
   session = null;
   view().innerHTML = `<main class="card done"><div class="hz big">好</div>
     <h2>All done for now</h2><p class="muted">${n} review${n === 1 ? "" : "s"} this session.</p>
+    ${mascotHTML("session")}
     ${streakHTML()}
     <button class="btn primary full" data-home>Home</button></main>`;
   bindHome(view());
@@ -819,6 +893,7 @@ function renderHome() {
   const learned = Object.keys(S.introduced).length;
   view().innerHTML = `<main class="home">
     <h1>HSK Tutor</h1>
+    ${mascotHTML()}
     ${streakHTML()}
     <nav class="levels">${[1, 2, 3, 4, 5, 6].map(l => `<button class="level ${l === 1 ? "on" : ""}" ${l === 1 ? "" : "disabled"}>HSK ${l}${l === 1 ? "" : "<small>soon</small>"}</button>`).join("")}</nav>
     <section class="stats">
@@ -837,6 +912,7 @@ function renderHome() {
     </div>
   </main>`;
   $("[data-study]").onclick = startSession;
+  updateBadge();
   $("[data-chart]").onclick = () => { chartScroll = 0; renderChart(); };
   view().querySelectorAll("[data-go]").forEach(b => b.onclick = () => ({ pad: () => renderPad(), pron: () => renderPron(), browse: renderBrowse, settings: renderSettings })[b.dataset.go]());
 }
@@ -968,7 +1044,7 @@ function startPronSession() {
 function nextPron() {
   window.scrollTo(0, 0);
   const it = psession.q.shift();
-  if (!it) { psession = null; view().innerHTML = `<main class="card done"><div class="hz big">好</div><h2>Ears trained!</h2>${streakHTML()}
+  if (!it) { psession = null; view().innerHTML = `<main class="card done"><div class="hz big">好</div><h2>Ears trained!</h2>${mascotHTML("session")}${streakHTML()}
       <button class="btn primary full" data-pback>Back to pronunciation</button></main>`; $("[data-pback]").onclick = () => renderPron("practice"); return; }
   if (it.kind === "pintro") return pronIntro(it.id);
   pronCard(it.id);
@@ -1166,6 +1242,9 @@ function renderSettings() {
     <hr>
     <div class="sync-box" data-sync></div>
     <hr>
+    <label class="check"><input type="checkbox" data-s="mascot" ${s.mascot !== false ? "checked" : ""}> Show Bao the mascot (rude, 18+)</label>
+    <div class="sync-box" data-remind></div>
+    <hr>
     <button class="btn" data-offline>Download all audio for offline use</button>
     <div class="row"><button class="btn ghost" data-export>Export progress</button>
     <label class="btn ghost">Import progress<input type="file" accept="application/json" data-import hidden></label></div>
@@ -1194,6 +1273,7 @@ function renderSettings() {
     if (confirm(msg)) { store.resetAll(); renderHome(); }
   };
   renderSyncBox();
+  renderRemindBox();
   $("[data-offline]").onclick = async (e) => {
     const btn = e.target, urls = [];
     for (const [k, vs] of Object.entries(audioIndex)) for (const v of vs) urls.push(`audio/${v}/${k}.mp3`);
@@ -1241,6 +1321,70 @@ function renderSyncBox() {
   };
 }
 sync.onStatus(() => renderSyncBox());
+
+/* ---------------- Bao's reminders (Web Push, sent by a scheduled GitHub job) ---------------- */
+const VAPID_PUBLIC = "BMMNJFV5OZb_fk_acDIUTU50EFgD1wNMe8d6VoBrf99SWbovhz5Zjb12Eym9avsTd4wfHNPBwJK2bA8EaK_bepk";
+const REMIND_HOURS = [8, 12, 17, 19, 21, 22];
+const b64uBytes = s => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)), c => c.charCodeAt(0));
+function deviceId() {
+  let id = localStorage.getItem("hsk-device");
+  if (!id) { id = Math.random().toString(36).slice(2, 10); localStorage.setItem("hsk-device", id); }
+  return id;
+}
+const myReminder = () => { const r = store.S().pushSubs?.[deviceId()]; return r && !r.off ? r : null; };
+async function enableReminders(hours) {
+  const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window))
+    throw new Error(standalone ? "This device can't receive web notifications (needs iOS 16.4 or later)."
+      : "On iPhone, notifications only work from the Home Screen app: Share → Add to Home Screen, open it from there, then turn this on.");
+  if (!sync.status().connected) throw new Error("Turn on sync first — Bao reads your progress from it to know when to nag you.");
+  if (await Notification.requestPermission() !== "granted") throw new Error("Notifications are blocked. Allow them in Settings → Notifications → HSK Tutor.");
+  const reg = await navigator.serviceWorker.ready;
+  const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uBytes(VAPID_PUBLIC) });
+  const S = store.S();
+  (S.pushSubs ||= {})[deviceId()] = { sub: sub.toJSON(), hours, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, at: Date.now() };
+  store.save();
+  await sync.syncNow();
+}
+async function disableReminders() {
+  const S = store.S();
+  (S.pushSubs ||= {})[deviceId()] = { off: true, at: Date.now() };
+  store.save();
+  try { const reg = await navigator.serviceWorker.ready; (await reg.pushManager.getSubscription())?.unsubscribe(); } catch {}
+  sync.syncNow().catch(() => {});
+}
+function renderRemindBox() {
+  const box = $("[data-remind]"); if (!box) return;
+  const r = myReminder(), hours = r?.hours || store.S().settings.remindHours || [12, 19, 21];
+  box.innerHTML = `<div class="label">Bao's reminders</div>
+    <p class="muted small">${r ? `On for this device. Bao checks in at these times and only nags if you haven't studied that day.`
+      : `Bao sends a push notification at the times you pick if you haven't studied that day — politely at first, then not. Needs sync on, and on iPhone the app must be opened from your Home Screen.`}</p>
+    <div class="chips hour-chips">${REMIND_HOURS.map(hr => `<button class="chip ${hours.includes(hr) ? "on" : ""}" data-hr="${hr}">${hr}:00</button>`).join("")}</div>
+    <div class="row">${r ? `<button class="btn ghost" data-rtest>Test notification</button><button class="btn ghost danger" data-roff>Turn off</button>`
+      : `<button class="btn primary" data-ron>Turn on reminders</button>`}</div>`;
+  box.querySelectorAll("[data-hr]").forEach(b => b.onclick = async () => {
+    const hr = +b.dataset.hr, set = new Set(hours);
+    set.has(hr) ? set.delete(hr) : set.add(hr);
+    const list = [...set].sort((a, c) => a - c);
+    store.S().settings.remindHours = list;
+    if (r) { Object.assign(store.S().pushSubs[deviceId()], { hours: list, at: Date.now() }); }
+    store.save(); renderRemindBox();
+  });
+  const on = $("[data-ron]", box);
+  if (on) on.onclick = async () => {
+    on.disabled = true; on.textContent = "Setting up…";
+    try { await enableReminders(hours); toast("Bao is watching you now 👀"); }
+    catch (e) { toast(e.message); }
+    renderRemindBox();
+  };
+  const off = $("[data-roff]", box); if (off) off.onclick = async () => { await disableReminders(); toast("Reminders off. Bao is sulking."); renderRemindBox(); };
+  const test = $("[data-rtest]", box);
+  if (test) test.onclick = async () => {
+    const st = mascotState(), pool = M.push[st.missed >= 7 ? "missed7" : st.missed >= 3 ? "missed3" : st.missed >= 1 ? "missed1" : "pending"];
+    const reg = await navigator.serviceWorker.ready;
+    reg.showNotification("Bao 包子", { body: fillLine(pick(pool), st), icon: "icon-180.png", tag: "bao" });
+  };
+}
 /** After a background sync brings in new progress, refresh the screen if it's safe (not mid-card). */
 function refreshAfterSync() { if ($(".home", view())) renderHome(); }
 function syncInBackground() { if (sync.status().connected) sync.syncNow().then(refreshAfterSync).catch(() => {}); }
@@ -1251,6 +1395,7 @@ async function boot() {
   try { audioIndex = await fetch("audio/index.json", { cache: "no-cache" }).then(r => r.ok ? r.json() : {}); } catch { audioIndex = {}; }
   D.words.forEach(w => { words[w.id] = w; });
   D.order.forEach((o, i) => { if (o.type === "comp") comps.add(o.id); ORDER_POS[o.id] = i; });
+  await loadMascot();
   renderHome();
   store.onSave(() => sync.schedule());
   syncInBackground();

@@ -1,0 +1,98 @@
+{
+  "name": "Bao",
+  "tagline": "your foul-mouthed study bun",
+  "lines": {
+    "fresh": [
+      "Hi, I'm Bao. I'm a steamed bun and your new study coach. Yes, this is your life now.",
+      "Zero cards studied. Bold. Let's change that before I get cold and soggy.",
+      "I'm stuffed with pork and expectations. Tap Study and don't make it weird.",
+      "Every legend starts somewhere. Yours starts with tapping that big red button, genius."
+    ],
+    "pending": [
+      "Your streak is {streak} days. Would be a real shame if you let it die like that houseplant.",
+      "{due} cards are waiting. They're not getting any younger. Neither are you.",
+      "Tick tock, sweet cheeks. The streak isn't going to keep itself alive.",
+      "I've seen glaciers with more hustle. Go study.",
+      "You've got {due} cards due and the attention span of a goldfish on espresso. Go.",
+      "Your streak isn't the only thing that's long and hard to maintain. Study.",
+      "Day {streak} is on the line. Don't you dare make me sad-steam.",
+      "Open the cards. I promise they don't bite. I might, though."
+    ],
+    "missed1": [
+      "Oh, you're alive? Could've fooled me. And your streak.",
+      "Skipped yesterday? Bold strategy. Let's see if your brain keeps the characters out of pity.",
+      "I'm not mad. I'm just a bun full of pork and disappointment.",
+      "Yesterday you chose literally anything over me. Cool. Cool cool cool.",
+      "One missed day. Your flashcards cried. I had to hold them. It was awkward.",
+      "Your streak died and I had to identify the body. Thanks for that."
+    ],
+    "missed3": [
+      "{days} days. I've had more commitment from a dating-app match whose only message was 'hey'.",
+      "Your flashcards filed a missing persons report.",
+      "At this point your Chinese vocabulary is 你好 and regret.",
+      "{days} days gone. I've started talking to the dumplings. They're better listeners than you.",
+      "Remember me? Round, soft, judgmental? Get your ass back in here.",
+      "Your brain called. It's deleting characters to make room for TikTok dances."
+    ],
+    "missed7": [
+      "A whole week. I've started seeing the Duolingo owl. He threatens people too, but at least he shows up.",
+      "{days} days. Your brain has quietly deleted half of what you learned. Congrats on your new hobby: forgetting shit.",
+      "I've gone stale. Literally. I'm a week-old bun. Look what you did.",
+      "{days} days of silence. I wrote you a breakup letter. In Chinese. You wouldn't be able to read it anyway.",
+      "At this point I'm just going to assume you got kidnapped. Blink twice if you need help. Or, you know, study."
+    ],
+    "done": [
+      "Look at you, studying like a responsible adult. Disgusting. I'm so proud.",
+      "Cards done. I'd kiss you but I'm a bun and that's legally complicated.",
+      "Studying again? Damn, consistency is sexy.",
+      "{streak}-day streak. You're on fire. Not literally. I'm the one who gets steamed.",
+      "You showed up today. The bar was on the floor and you stepped right over it. Proud of you.",
+      "Your brain is getting thicc with characters. Love that for you.",
+      "You came, you studied, you conquered. Now go drink some water, you beautiful nerd."
+    ],
+    "streak": [
+      "{streak} days straight. Your stamina is frankly impressive. The flashcards are blushing.",
+      "{streak} days! Keep this up and you'll order food in Beijing without pointing like a caveman.",
+      "{streak}-day streak. If consistency were a person, it'd be you, and it'd be hot.",
+      "{streak} days in a row. I'd get you a trophy but I spent my budget on soy sauce."
+    ],
+    "session": [
+      "Nice session. Go hydrate, you gorgeous nerd.",
+      "Done! Your brain just did a little workout. It's sweaty. It's fine.",
+      "That's how it's done. Same time tomorrow, or I start the guilt trip.",
+      "Look at that. Productive AND attractive. Some people have it all."
+    ]
+  },
+  "push": {
+    "pending": [
+      "Your {streak}-day streak dies at midnight. No pressure. Lots of pressure.",
+      "{due} cards are waiting. So am I. Impatiently. With my arms crossed.",
+      "Hey you. Yes, you. Five minutes of flashcards. Don't make me beg. I'll beg.",
+      "Your streak called. It's feeling neglected. Go put a ring on it.",
+      "It's {hour}. You know what would be sexy right now? Opening your flashcards."
+    ],
+    "fresh": [
+      "Your first card is waiting. It's nervous. Be gentle.",
+      "Bao here. Hungry for knowledge? Because I'm literally just hungry. Study."
+    ],
+    "missed1": [
+      "You skipped yesterday. I noticed. I always notice.",
+      "Yesterday: no study. Today: redemption arc? Tap here, coward.",
+      "Your streak is dead. Come pay your respects and start a new one."
+    ],
+    "missed3": [
+      "{days} days without studying. The flashcards are starting a support group.",
+      "I'm not saying you ghosted me for {days} days, but I'm writing a sad song about it.",
+      "{days} days. Your brain is forgetting things faster than you forget my birthday."
+    ],
+    "missed7": [
+      "{days} days. I've grown mold. This is on you.",
+      "It's been {days} days. I'm not angry, I'm just going to tell everyone at the dim sum restaurant.",
+      "Remember Chinese? It remembers you. Vaguely. With disappointment."
+    ],
+    "praise": [
+      "{streak} days straight. Who even are you? Keep going, you absolute legend.",
+      "Studied today? Hell yes. Bao approves. Bao is aroused intellectually."
+    ]
+  }
+}

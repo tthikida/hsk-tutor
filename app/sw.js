@@ -1,7 +1,7 @@
 // Offline support: app shell is precached; stroke data and audio are cached the first time they're used.
-const VERSION = "v9";
-const SHELL = ["./", "index.html", "styles.css?v=9", "js/app.js?v=9", "js/srs.js?v=9", "js/store.js?v=9", "js/sync.js?v=9",
-  "vendor/hanzi-writer.min.js", "data/hsk1.json", "data/charlevels.json", "data/pinyin.json", "manifest.webmanifest", "icon.svg", "icon-180.png"];
+const VERSION = "v10";
+const SHELL = ["./", "index.html", "styles.css?v=10", "js/app.js?v=10", "js/srs.js?v=10", "js/store.js?v=10", "js/sync.js?v=10",
+  "vendor/hanzi-writer.min.js", "data/hsk1.json", "data/charlevels.json", "data/pinyin.json", "data/mascot.json", "manifest.webmanifest", "icon.svg", "icon-180.png"];
 
 // "reload"/"no-cache" make the worker check GitHub for new code instead of trusting the browser's HTTP cache
 self.addEventListener("install", e => {
@@ -37,4 +37,20 @@ self.addEventListener("fetch", e => {
     if (r.ok) cache.put(e.request, r.clone());
     return r;
   })());
+});
+
+// Bao's reminders: pushed by the scheduled GitHub job (tools/remind.mjs)
+self.addEventListener("push", e => {
+  let d = {};
+  try { d = e.data.json(); } catch { d = { body: e.data ? e.data.text() : "Study time." }; }
+  const jobs = [self.registration.showNotification(d.title || "Bao 包子", {
+    body: d.body, icon: "icon-180.png", badge: "icon-180.png", tag: "bao", renotify: true, data: { url: "./" },
+  })];
+  if (typeof d.badge === "number" && self.navigator.setAppBadge) jobs.push(d.badge ? self.navigator.setAppBadge(d.badge) : self.navigator.clearAppBadge());
+  e.waitUntil(Promise.all(jobs).catch(() => {}));
+});
+self.addEventListener("notificationclick", e => {
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(ws =>
+    ws.length ? ws[0].focus() : self.clients.openWindow(e.notification.data?.url || "./")));
 });
