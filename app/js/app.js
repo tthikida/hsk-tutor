@@ -1,6 +1,6 @@
-import { newCard, review, preview } from "./srs.js?v=10";
-import * as store from "./store.js?v=10";
-import * as sync from "./sync.js?v=10";
+import { newCard, review, preview } from "./srs.js?v=11";
+import * as store from "./store.js?v=11";
+import * as sync from "./sync.js?v=11";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -314,7 +314,9 @@ function animateWord(el, text) {
     const box = h(`<div class="grid-box small" style="width:${size}px;height:${size}px"></div>`);
     el.append(box);
     const w = HanziWriter.create(box, c, { width: size, height: size, padding: 5, charDataLoader: loader,
-      strokeColor: getComputedStyle(document.body).getPropertyValue("--ink").trim(), delayBetweenStrokes: 250 });
+      strokeColor: getComputedStyle(document.body).getPropertyValue("--ink").trim() || "#222",
+      outlineColor: "rgba(128,128,128,.25)",   // the default #DDD looks like a finished character on the dark theme
+      delayBetweenStrokes: 250 });
     box.onclick = () => w.animateCharacter();
     setTimeout(() => w.animateCharacter(), 300);
   });
