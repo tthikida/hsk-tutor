@@ -1,6 +1,6 @@
 // Offline support: app shell is precached; stroke data and audio are cached the first time they're used.
-const VERSION = "v13";
-const SHELL = ["./", "index.html", "styles.css?v=13", "js/app.js?v=13", "js/srs.js?v=13", "js/store.js?v=13", "js/sync.js?v=13", "js/grade.js?v=13",
+const VERSION = "v14";
+const SHELL = ["./", "index.html", "styles.css?v=14", "js/app.js?v=14", "js/srs.js?v=14", "js/store.js?v=14", "js/sync.js?v=14", "js/grade.js?v=14",
   "vendor/hanzi-writer.min.js", "data/hsk1.json", "data/charlevels.json", "data/pinyin.json", "data/mascot.json", "manifest.webmanifest", "icon.svg", "icon-180.png"];
 
 // "reload"/"no-cache" make the worker check GitHub for new code instead of trusting the browser's HTTP cache
@@ -16,26 +16,20 @@ self.addEventListener("fetch", e => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== location.origin) return;
   const path = url.pathname;
-  // the audio list changes while clips are being generated: network first
-  if (path.endsWith("/audio/index.json")) {
-    e.respondWith(fetch(e.request.url, { cache: "no-cache" }).then(r => { const copy = r.clone(); caches.open("hsk-audio").then(c => c.put(e.request, copy)); return r; })
-      .catch(() => caches.match(e.request)));
-    return;
-  }
-  const bucket = path.includes("/audio/") ? "hsk-audio" : path.includes("/data/strokes/") ? "hsk-strokes" : `shell-${VERSION}`;
-  // app code: network first so updates show up; everything else: cache first
-  const networkFirst = bucket.startsWith("shell-");
-  if (networkFirst) {
-    // Network first, but don't wait on a slow connection: after a moment use the cached copy of this exact
-    // file (same ?v= stamp, so versions never mix) while the download carries on and refreshes the cache.
+  const isAudioList = path.endsWith("/audio/index.json");
+  const bucket = isAudioList ? "hsk-audio" : path.includes("/audio/") ? "hsk-audio" : path.includes("/data/strokes/") ? "hsk-strokes" : `shell-${VERSION}`;
+  // The page, unstamped data files and the audio list: answer instantly from the phone's copy and
+  // refresh that copy in the background, so launching never waits on the network. New app code
+  // arrives through a new service worker (sw.js changes with every version), and the page reloads
+  // itself onto it at launch (see app.js).
+  if (bucket.startsWith("shell-") && !url.search || isAudioList) {
     const net = caches.open(bucket).then(cache => fetch(e.request.url, { cache: "no-cache" })
       .then(r => { if (r.ok) cache.put(e.request, r.clone()); return r; }));
     e.waitUntil(net.catch(() => {}));
-    const slow = new Promise(res => setTimeout(res, 1500)).then(() => caches.match(e.request)).then(hit => hit || net);
-    e.respondWith(Promise.race([net, slow]).catch(async () =>
-      (await caches.match(e.request)) || (await caches.match(e.request, { ignoreSearch: true })) || Response.error()));
+    e.respondWith(caches.match(e.request).then(hit => hit || net).catch(() => Response.error()));
     return;
   }
+  // stamped app code (?v=N never changes once published), stroke data and audio clips: cache first
   e.respondWith((async () => {
     const cache = await caches.open(bucket);
     const hit = await cache.match(e.request);

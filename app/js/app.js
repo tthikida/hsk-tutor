@@ -1,7 +1,7 @@
-import { newCard, review, preview } from "./srs.js?v=13";
-import * as store from "./store.js?v=13";
-import * as sync from "./sync.js?v=13";
-import { gradeStrokes, verdict } from "./grade.js?v=13";
+import { newCard, review, preview } from "./srs.js?v=14";
+import * as store from "./store.js?v=14";
+import * as sync from "./sync.js?v=14";
+import { gradeStrokes, verdict } from "./grade.js?v=14";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -1549,13 +1549,15 @@ function syncInBackground() { if (sync.status().connected) sync.syncNow().then(r
 const bootStatus = t => window.bootStatus?.(t);
 async function boot() {
   bootStatus("Fetching the word list…");
-  D = await fetch("data/hsk1.json").then(r => r.json());
-  bootStatus("Tuning the voices…");
-  try { audioIndex = await fetch("audio/index.json", { cache: "no-cache" }).then(r => r.ok ? r.json() : {}); } catch { audioIndex = {}; }
+  // all three at once rather than one after another
+  const [data, audio] = await Promise.all([
+    fetch("data/hsk1.json").then(r => r.json()),
+    fetch("audio/index.json").then(r => r.ok ? r.json() : {}).catch(() => ({})),
+    loadMascot(),
+  ]);
+  D = data; audioIndex = audio;
   D.words.forEach(w => { words[w.id] = w; });
   D.order.forEach((o, i) => { if (o.type === "comp") comps.add(o.id); ORDER_POS[o.id] = i; });
-  bootStatus("Waking Bao…");
-  await loadMascot();
   renderHome();
   window.bootDone?.();
   store.onSave(() => sync.schedule());
@@ -1565,6 +1567,14 @@ async function boot() {
     else if (sync.pending()) sync.syncNow().catch(() => {});   // leaving the app: upload now instead of waiting
   });
   if (navigator.storage?.persist) navigator.storage.persist();
-  if ("serviceWorker" in navigator && location.protocol !== "file:") navigator.serviceWorker.register("sw.js");
+  if ("serviceWorker" in navigator && location.protocol !== "file:") {
+    // The app opens from the phone's copy; a newer version installs in the background. When it takes
+    // over shortly after launch and nothing is under way yet, reload onto it so updates show up at once.
+    const hadController = !!navigator.serviceWorker.controller, launched = Date.now();
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (hadController && Date.now() - launched < 20000 && $(".home", view()) && $("#sheet").hidden) location.reload();
+    });
+    navigator.serviceWorker.register("sw.js");
+  }
 }
 boot().catch(e => { window.bootDone?.(); view().innerHTML = `<main class="card"><p>Couldn't load the app data.</p><pre>${esc(e.message)}</pre></main>`; });
