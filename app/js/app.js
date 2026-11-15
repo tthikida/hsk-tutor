@@ -1,7 +1,8 @@
-import { newCard, review, preview } from "./srs.js?v=15";
-import * as store from "./store.js?v=15";
-import * as sync from "./sync.js?v=15";
-import { gradeStrokes, verdict } from "./grade.js?v=15";
+import { newCard, review, preview } from "./srs.js?v=16";
+import * as store from "./store.js?v=16";
+import * as sync from "./sync.js?v=16";
+import { gradeStrokes, verdict } from "./grade.js?v=16";
+import * as bao from "./bao.js?v=16";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -431,6 +432,7 @@ function testChar(host, chars, idx, { onDone, onNextChar, onFinish, wordScores }
     graded = true;
     const r = gradeStrokes(strokes.map(st => st.map(toBox)), data.medians);
     saveTest(c, r.score, peeked);
+    if (!peeked) baoReact(r.score >= 70, r.score >= 90 || r.score < 30);
     onDone(r.score);
     // show: faint model underneath, your strokes coloured by how well each matched
     ctx.clearRect(0, 0, W2, W2); drawModel(0.18);
@@ -646,48 +648,65 @@ function fillLine(s, st) {
   const due = dueCards().length + pronDue().length;
   return s.replace(/\{streak\}/g, st.n).replace(/\{due\}/g, due).replace(/\{days\}/g, st.missed).replace(/\{hour\}/g, new Date().getHours() + ":00");
 }
-function baoSVG(mood) {
-  const eyes = {
-    ecstatic: `<path d="M38 60q6-8 12 0M70 60q6-8 12 0" class="bao-line"/>`,
-    happy: `<path d="M38 61q6-7 12 0M70 61q6-7 12 0" class="bao-line"/>`,
-    neutral: `<g class="bao-blink"><circle cx="44" cy="60" r="4.5"/><circle cx="76" cy="60" r="4.5"/></g>`,
-    annoyed: `<circle cx="44" cy="62" r="4"/><circle cx="76" cy="62" r="4"/><path d="M37 58h14M69 58h14" class="bao-line"/>`,
-    furious: `<circle cx="44" cy="63" r="4"/><circle cx="76" cy="63" r="4"/><path d="M36 53l14 6M84 53l-14 6" class="bao-line"/>`,
-  }[mood];
-  const mouth = {
-    ecstatic: `<path d="M50 72q10 14 20 0z" class="bao-mouth"/>`,
-    happy: `<path d="M51 73q9 8 18 0" class="bao-line"/>`,
-    neutral: `<path d="M54 74q6 4 12 0" class="bao-line"/>`,
-    annoyed: `<path d="M53 76h14" class="bao-line"/>`,
-    furious: `<path d="M51 79q9-9 18 0" class="bao-line"/>`,
-  }[mood];
-  const extra = {
-    ecstatic: `<g class="bao-steam"><path d="M46 14q-5-6 0-12M60 10q-5-6 0-12M74 14q-5-6 0-12"/></g>`,
-    happy: `<g class="bao-steam"><path d="M52 14q-5-6 0-12M68 14q-5-6 0-12"/></g>`,
-    neutral: "",
-    annoyed: `<path d="M92 40q4 8 0 10q-4-2 0-10z" class="bao-sweat"/>`,
-    furious: `<path d="M86 30l6 6M92 30l-6 6M89 27v12M83 33h12" class="bao-vein"/>`,
-  }[mood];
-  return `<svg class="bao bao-${mood}" viewBox="0 0 120 100" aria-hidden="true">${extra}
-    <path d="M14 82q-6-30 22-48q12-12 24-14q12 2 24 14q28 18 22 48q-2 10-46 10t-46-10z" class="bao-body"/>
-    <path d="M60 20q-4 10-14 14M60 20q4 10 14 14M60 20v12M60 20q-12 4-22 12M60 20q12 4 22 12" class="bao-pleat"/>
-    <ellipse cx="34" cy="70" rx="6" ry="3.5" class="bao-cheek"/><ellipse cx="86" cy="70" rx="6" ry="3.5" class="bao-cheek"/>
-    <g class="bao-face">${eyes}${mouth}</g></svg>`;
-}
 /** Bao with a speech bubble. pool overrides the automatic choice (e.g. "session"). */
+function mascotOn() { return !!M && store.S().settings.mascot !== false; }
 function mascotHTML(pool) {
-  if (!M || store.S().settings.mascot === false) return "";
-  const st = mascotState();
-  const line = fillLine(pick(M.lines[pool || st.pool] || M.lines.done), st);
-  return `<section class="mascot" data-mascot="${pool || ""}">${baoSVG(pool === "session" ? "happy" : st.mood)}
+  if (!mascotOn()) return "";
+  const st = mascotState(), hr = new Date().getHours();
+  let mood = pool === "session" ? "session" : st.mood, linePool = pool || st.pool;
+  if (!pool && (hr >= 23 || hr < 5) && mood !== "furious") { mood = "sleepy"; if (M.lines.night && Math.random() < .6) linePool = "night"; }
+  const base = bao.BASE[mood] || "neutral";
+  const line = fillLine(pick(M.lines[linePool] || M.lines.done), st);
+  return `<section class="mascot" data-mascot="${pool || ""}" data-mood="${mood}" data-base="${base}" data-enter="${pool === "session" ? "flip" : "peek"}">${bao.svg(base)}
     <div class="bubble"><b>${esc(M.name)}</b><span>${esc(line)}</span></div></section>`;
 }
-document.addEventListener("click", e => {
-  const m = e.target.closest(".mascot");
-  if (!m) return;
-  const fresh = h(mascotHTML(m.dataset.mascot || undefined));
-  if (fresh) { fresh.classList.add("bounce"); m.replaceWith(fresh); }
-});
+/** What Bao says when tapped: pool = "poke" | "pokeMad" | "squish" | "wake", or nothing for his usual lines. */
+function mascotLine(sec, pool) {
+  if (!M) return "";
+  const st = mascotState();
+  return fillLine(pick(M.lines[pool] || M.lines[sec.dataset.mascot || st.pool] || M.lines.done), st);
+}
+bao.watch(mascotLine);
+
+// the little Bao in the corner reacting to answers
+let combo = 0;
+const CHEER = ["好!", "对!", "棒!", "厉害!", "Nice!", "Yes!", "不错!"], OOPS = ["哎呀!", "不对…", "啊?", "Oof.", "加油!", "Again…"];
+function baoReact(good, big = false) {
+  if (!mascotOn()) return;
+  combo = good ? combo + 1 : 0;
+  if (good && combo > 0 && combo % 5 === 0) return bao.pop(pick(["celebrate", "starstruck", "ecstatic"]), `${combo} in a row! 厉害!`);
+  if (big) return bao.pop(good ? pick(["celebrate", "starstruck", "proud", "love"]) : pick(["crying", "shocked", "ko"]), good ? pick(CHEER) : pick(OOPS));
+  if (Math.random() > (good ? .22 : .45)) return;
+  bao.pop(good ? pick(["happy", "proud", "wink", "laughing", "cool", "love", "ecstatic", "starstruck", "munching"])
+    : pick(["shocked", "confused", "sad", "nervous", "dizzy", "pleading", "embarrassed", "disgusted"]), good ? pick(CHEER) : pick(OOPS));
+}
+
+/* ---------------- Meet Bao: every face and move ---------------- */
+function renderBaoGallery() {
+  const faces = Object.keys(bao.FACES).filter(f => !["achoo", "sneezy"].includes(f));
+  const nice = f => f.replace(/^ko$/, "KO").replace(/^./, c => c.toUpperCase());
+  view().innerHTML = `${simpleHeader("Meet Bao")}<main class="card">
+    <div class="bao-stage">${bao.svg("happy")}</div><div class="bao-stage-name">Happy</div>
+    <p class="muted small center">${faces.length} faces and ${Object.keys(bao.MOVES).length} moves. Tap one to try it. On the home screen, tap Bao, poke him a lot, or press and hold.</p>
+    <div class="label">Faces</div>
+    <div class="bao-grid">${faces.map(f => `<button data-face="${f}">${bao.svg(f)}<span>${nice(f)}</span></button>`).join("")}</div>
+    <div class="label" style="margin-top:14px">Moves</div>
+    <div class="bao-moves">${Object.keys(bao.MOVES).map(m => `<button data-move="${m}">${m}</button>`).join("")}</div>
+  </main>`;
+  bindHome(view());
+  const stage = $(".bao-stage svg"), name = $(".bao-stage-name");
+  view().querySelectorAll("[data-face]").forEach(b => b.onclick = () => {
+    const f = b.dataset.face;
+    if (f === "sneezy") return;
+    bao.setFace(stage, f); name.textContent = nice(f); bao.move(stage, bao.FACE_MOVE[f] || "bounce");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+  view().querySelectorAll("[data-move]").forEach(b => b.onclick = () => {
+    if (b.dataset.move === "squish") { bao.move(stage, "squish"); setTimeout(() => { stage.classList.remove("a-squish"); bao.move(stage, "boing"); }, 700); }
+    else bao.move(stage, b.dataset.move);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+}
 /** Red number on the home-screen icon = cards due (vocabulary + sounds). */
 function updateBadge() {
   try {
@@ -733,6 +752,7 @@ function grade(cid, g) {
   markActive();
   store.save();
   session.done++;
+  baoReact(g >= 3);
   if (g === 1) session.q.splice(Math.min(session.q.length, 4), 0, { kind: "card", id: cid }); // see it again soon
   nextCard();
 }
@@ -1399,6 +1419,7 @@ function renderSettings() {
     <div class="sync-box" data-sync></div>
     <hr>
     <label class="check"><input type="checkbox" data-s="mascot" ${s.mascot !== false ? "checked" : ""}> Show Bao the mascot (rude, 18+)</label>
+    <button class="btn ghost" data-meetbao>Meet Bao: all his faces & moves</button>
     <div class="sync-box" data-remind></div>
     <hr>
     <button class="btn" data-offline>Download all audio for offline use</button>
@@ -1431,6 +1452,7 @@ function renderSettings() {
   };
   renderSyncBox();
   renderRemindBox();
+  $("[data-meetbao]").onclick = renderBaoGallery;
   $("[data-offline]").onclick = async (e) => {
     const btn = e.target, urls = [];
     for (const [k, vs] of Object.entries(audioIndex)) for (const v of vs) urls.push(`audio/${v}/${k}.mp3`);

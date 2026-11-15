@@ -317,24 +317,7 @@ pre { white-space: pre-wrap; }
 .p-feedback .ok { color: var(--ok); font-weight: 700; font-size: 18px; margin: 6px 0; }
 .p-feedback .bad { color: var(--accent); font-size: 18px; margin: 6px 0; }
 
-/* Bao the mascot */
-.mascot { display: grid; grid-template-columns: 92px 1fr; align-items: center; gap: 8px; margin: 4px 0 12px; cursor: pointer; -webkit-user-select: none; user-select: none; }
-.bao { width: 92px; height: 78px; overflow: visible; animation: bao-bob 2.6s ease-in-out infinite; transform-origin: 50% 90%; }
-.mascot.bounce .bao { animation: bao-bounce .5s ease-out, bao-bob 2.6s ease-in-out .5s infinite; }
-.bao-body { fill: #f7ead6; stroke: #d8b88c; stroke-width: 2; }
-.bao-pleat { fill: none; stroke: #d8b88c; stroke-width: 1.6; stroke-linecap: round; }
-.bao-cheek { fill: #f2a7a0; opacity: .7; }
-.bao-face circle { fill: #3a2a20; }
-.bao-line { fill: none; stroke: #3a2a20; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
-.bao-mouth { fill: #a33a2c; stroke: #3a2a20; stroke-width: 2.5; stroke-linejoin: round; }
-.bao-steam path { fill: none; stroke: var(--muted); stroke-width: 2.5; stroke-linecap: round; opacity: .6; animation: bao-steam 2s ease-in-out infinite; }
-.bao-steam path:nth-child(2) { animation-delay: .6s; } .bao-steam path:nth-child(3) { animation-delay: 1.2s; }
-.bao-sweat { fill: #8fc8f0; }
-.bao-vein { stroke: #d33; stroke-width: 3; stroke-linecap: round; }
-.bao-blink { animation: bao-blink 4s infinite; transform-origin: 60px 60px; }
-.bao-annoyed { animation-duration: 3.4s; }
-.bao-furious { animation: bao-shake .35s ease-in-out infinite; }
-.bao-furious .bao-body { fill: #f6d0c0; }
+/* Bao the mascot: see js/bao.js and the Bao section at the end of this file */
 .bubble { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px; font-size: 14px; line-height: 1.4; }
 .bubble::before { content: ""; position: absolute; left: -8px; top: 22px; border: 8px solid transparent; border-right-color: var(--line); border-left: 0; }
 .bubble b { display: block; font-size: 12px; color: var(--accent); margin-bottom: 2px; }
@@ -342,12 +325,6 @@ pre { white-space: pre-wrap; }
 .hour-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .hour-chips .chip { font-size: 14px; font-family: inherit; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; padding: 6px 10px; }
 .hour-chips .chip.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, var(--card)); }
-@keyframes bao-bob { 0%, 100% { transform: translateY(0) scale(1, 1); } 50% { transform: translateY(-4px) scale(1.02, .98); } }
-@keyframes bao-bounce { 0% { transform: scale(1); } 30% { transform: scale(1.15, .85); } 60% { transform: scale(.92, 1.1) translateY(-8px); } 100% { transform: scale(1); } }
-@keyframes bao-shake { 0%, 100% { transform: translateX(0) rotate(0); } 25% { transform: translateX(-2px) rotate(-2deg); } 75% { transform: translateX(2px) rotate(2deg); } }
-@keyframes bao-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
-@keyframes bao-steam { 0% { opacity: 0; transform: translateY(6px); } 40% { opacity: .7; } 100% { opacity: 0; transform: translateY(-6px); } }
-@media (prefers-reduced-motion: reduce) { .bao, .bao-steam path, .bao-blink { animation: none !important; } }
 
 /* handwriting test */
 .test { display: flex; flex-direction: column; align-items: center; }
@@ -364,3 +341,165 @@ pre { white-space: pre-wrap; }
 .t-issues li { margin: 2px 0; }
 .t-word { margin-top: 8px; }
 .t-anim { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; }
+
+/* ---------------- Bao the mascot (faces & moves come from js/bao.js) ---------------- */
+.mascot { display: grid; grid-template-columns: 92px 1fr; align-items: center; gap: 8px; margin: 4px 0 12px; cursor: pointer;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+.bubble.pop { animation: bao-say .3s ease-out; }
+@keyframes bao-say { 0% { transform: scale(.94); } 60% { transform: scale(1.03); } 100% { transform: none; } }
+.bao { width: 92px; height: 78px; overflow: visible; --d: .6s; }
+.bao g, .bao path, .bao circle, .bao ellipse, .bao rect, .bao text { transform-box: fill-box; transform-origin: center; }
+.bao .bao-idle, .bao .bao-rig, .bao .bao-shadow { transform-box: view-box; transform-origin: 60px 92px; }
+.bao .bao-idle { animation: b-breathe 2.6s ease-in-out infinite; }
+.bao .bao-face { transform-box: view-box; transform: translate(var(--lx, 0), var(--ly, 0)); transition: transform .25s ease-out; }
+.bao .bao-eyes { transform-box: view-box; transform-origin: 60px 60px; transition: transform .06s; }
+.bao .bao-eyes.blink { transform: scaleY(.1); }
+.bao-shadow { fill: rgba(0,0,0,.1); }
+.bao-body { fill: #f7ead6; stroke: #d8b88c; stroke-width: 2; transition: fill .3s; }
+.bao-pleat { fill: none; stroke: #d8b88c; stroke-width: 1.6; stroke-linecap: round; }
+.bao-cheek { fill: #f2a7a0; opacity: .7; transition: opacity .3s, transform .3s; }
+.bao.bl .bao-cheek { opacity: 1; transform: scale(1.35); }
+.bao.t-red .bao-body { fill: #f6cdbd; } .bao.t-green .bao-body { fill: #e3ead0; stroke: #b5c48f; }
+.bao.t-pale .bao-body { fill: #f5f3ee; stroke: #cfc6b8; } .bao.t-dark .bao-body { fill: #e6d2bc; } .bao.t-dark .bao-cheek { opacity: .25; }
+.bao .ink { fill: #3a2a20; } .bao .hl { fill: #fff; } .bao .white { fill: #fff; stroke: #3a2a20; stroke-width: 2; }
+.bao .ln { fill: none; stroke: #3a2a20; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.bao .ln.thin { stroke-width: 1.6; } .bao .brow { stroke-width: 2.6; }
+.bao .mo { fill: #a33a2c; stroke: #3a2a20; stroke-width: 2.5; stroke-linejoin: round; }
+.bao .tg { fill: #f08a8a; } .bao .th { fill: #fff; stroke: #3a2a20; stroke-width: 2; }
+.bao .wet { fill: none; stroke: #8fc8f0; stroke-width: 2; stroke-linecap: round; }
+.bao .drop { fill: #8fc8f0; } .bao .stream { fill: none; stroke: #8fc8f0; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 5 4; animation: fx-stream .35s linear infinite; }
+.bao .love { fill: #e8506a; } .bao .gold { fill: #ffc233; stroke: #d99a00; stroke-width: .8; }
+.bao .vein { fill: none; stroke: #d33; stroke-width: 3; stroke-linecap: round; }
+.bao .pinkln { fill: none; stroke: #e57f86; stroke-width: 1.6; stroke-linecap: round; }
+.bao .snot { fill: rgba(170,215,245,.55); stroke: #8fc8f0; stroke-width: 1; }
+.bao .bulb { fill: #ffe066; stroke: #d9a900; stroke-width: 1.4; } .bao .ray { fill: none; stroke: #ffc233; stroke-width: 2; stroke-linecap: round; }
+.bao .shade { fill: #222; } .bao .glint { stroke: rgba(255,255,255,.75); stroke-width: 1.6; stroke-linecap: round; }
+.bao .cloud { fill: #b9c0c9; } .bao .raindrop { stroke: #8fc8f0; stroke-width: 2; stroke-linecap: round; animation: fx-rain .8s linear infinite; }
+.bao .flame { fill: #ff8a2a; opacity: .85; } .bao .halo { fill: none; stroke: #ffc233; stroke-width: 2.5; }
+.bao text { font-family: -apple-system, system-ui, sans-serif; font-weight: 800; }
+.bao .txt-muted { fill: var(--muted); } .bao .txt-accent { fill: var(--accent); }
+.bao .fx-steam path { fill: none; stroke: var(--muted); stroke-width: 2.5; stroke-linecap: round; opacity: .6; animation: fx-steam 2s ease-in-out infinite; }
+.bao .fx-steam path:nth-child(2) { animation-delay: .6s; } .bao .fx-steam path:nth-child(3) { animation-delay: 1.2s; }
+.bao .fx-smoke circle, .bao .fx-puff circle, .bao .fx-sigh circle { fill: color-mix(in srgb, var(--muted) 45%, transparent); }
+.bao .fx-dots circle { fill: var(--muted); animation: fx-dot 1.2s ease-in-out infinite; } .bao .fx-dots circle:nth-child(2) { animation-delay: .2s; } .bao .fx-dots circle:nth-child(3) { animation-delay: .4s; }
+.bao .fx-spray circle { fill: #8fc8f0; }
+/* effect motion */
+.bao .fx-drip { animation: fx-drip 1.6s ease-in infinite; } .bao .fx-fall { animation: fx-fall 1.3s ease-in infinite; }
+.bao .d2 { animation-delay: .7s; } .bao .d1 { animation-delay: .25s; } .bao .d3 { animation-delay: .5s; } .bao .d4 { animation-delay: .9s; }
+.bao .fx-throb { animation: fx-throb .6s ease-in-out infinite; } .bao .fx-beat { animation: fx-throb .7s ease-in-out infinite; }
+.bao .fx-rise > * { animation: fx-rise 2.2s ease-out infinite; opacity: 0; } .bao .fx-rise > :nth-child(2) { animation-delay: .7s; } .bao .fx-rise > :nth-child(3) { animation-delay: 1.4s; }
+.bao .fx-twinkle > * { animation: fx-twinkle 1.6s ease-in-out infinite; } .bao .fx-twinkle > :nth-child(2) { animation-delay: .4s; }
+.bao .fx-twinkle > :nth-child(3) { animation-delay: .8s; } .bao .fx-twinkle > :nth-child(4) { animation-delay: 1.2s; }
+.bao .fx-wobble { animation: fx-wobble 1s ease-in-out infinite; } .bao .fx-popin { animation: fx-popin .4s cubic-bezier(.3,1.6,.6,1) both; }
+.bao .fx-orbit { transform-box: view-box; transform-origin: 0 0; animation: fx-orbit 1.2s linear infinite; }
+.bao .fx-spin { animation: fx-orbit 1s linear infinite; } .bao .fx-bubble { animation: fx-bubble 2.4s ease-in-out infinite alternate; }
+.bao .fx-glow { animation: fx-glow 1s ease-in-out infinite alternate; } .bao .fx-chomp { animation: fx-chomp .25s ease-in-out infinite alternate; }
+.bao .fx-confetti rect { animation: fx-confetti 1.8s ease-in infinite; } .bao .fx-fire .flame { transform-origin: 50% 100%; animation: fx-flicker .25s ease-in-out infinite alternate; }
+.bao .fx-fire .flame:nth-child(even) { animation-delay: .12s; }
+.bao .fx-hover { animation: fx-hover 2s ease-in-out infinite; } .bao .fx-crumbs circle { fill: #d8b88c; animation: fx-fall .9s ease-in infinite; }
+.bao .fx-puff > g { animation: fx-puff 1s ease-out infinite; } .bao .fx-puff > g:nth-child(2) { animation-delay: .5s; }
+.bao .fx-smoke circle { animation: fx-smoke 1.6s ease-out infinite; } .bao .fx-smoke circle:nth-child(2) { animation-delay: .5s; } .bao .fx-smoke circle:nth-child(3) { animation-delay: 1s; }
+.bao .fx-sigh { animation: fx-sigh 1.6s ease-out infinite; } .bao .fx-spray { animation: fx-spray .6s ease-out both; }
+.bao .fx-cloudy { animation: fx-hover 3s ease-in-out infinite; }
+@keyframes fx-steam { 0% { opacity: 0; transform: translateY(6px); } 40% { opacity: .7; } 100% { opacity: 0; transform: translateY(-6px); } }
+@keyframes fx-drip { 0% { transform: translateY(-2px); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(8px); opacity: 0; } }
+@keyframes fx-fall { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(16px); opacity: 0; } }
+@keyframes fx-throb { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.25); } }
+@keyframes fx-rise { 0% { opacity: 0; transform: translateY(6px) scale(.6); } 25% { opacity: 1; } 100% { opacity: 0; transform: translateY(-14px) scale(1.1); } }
+@keyframes fx-twinkle { 0%, 100% { transform: scale(.2) rotate(0); opacity: 0; } 50% { transform: scale(1) rotate(45deg); opacity: 1; } }
+@keyframes fx-wobble { 0%, 100% { transform: rotate(-10deg); } 50% { transform: rotate(10deg) translateY(-2px); } }
+@keyframes fx-popin { 0% { transform: scale(0); } 100% { transform: scale(1); } }
+@keyframes fx-orbit { to { transform: rotate(360deg); } }
+@keyframes fx-bubble { 0% { transform: scale(.35); } 100% { transform: scale(1.3); } }
+@keyframes fx-glow { 0% { opacity: .75; transform: scale(.96); } 100% { opacity: 1; transform: scale(1.05); } }
+@keyframes fx-chomp { 0% { transform: scaleY(1); } 100% { transform: scaleY(.2); } }
+@keyframes fx-confetti { 0% { transform: translateY(0) rotate(0); opacity: 0; } 10% { opacity: 1; } 100% { transform: translateY(70px) rotate(540deg); opacity: 0; } }
+@keyframes fx-flicker { 0% { transform: scale(.85, .8); } 100% { transform: scale(1.1, 1.15); } }
+@keyframes fx-hover { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes fx-puff { 0% { transform: scale(.4); opacity: .9; } 100% { transform: scale(1.4) translateY(-6px); opacity: 0; } }
+@keyframes fx-smoke { 0% { transform: translateY(4px) scale(.5); opacity: .8; } 100% { transform: translateY(-14px) scale(1.4); opacity: 0; } }
+@keyframes fx-sigh { 0% { transform: translate(0, 0) scale(.6); opacity: .8; } 100% { transform: translate(-10px, -4px) scale(1.3); opacity: 0; } }
+@keyframes fx-spray { 0% { transform: scale(.3); opacity: 1; } 100% { transform: scale(1.6) translateY(6px); opacity: 0; } }
+@keyframes fx-dot { 0%, 100% { opacity: .2; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-3px); } }
+@keyframes fx-rain { 0% { transform: translateY(0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(10px); opacity: 0; } }
+@keyframes fx-stream { to { stroke-dashoffset: -9; } }
+/* resting motions */
+.bao.i-tremble .bao-idle { animation: b-tremble .5s linear infinite; }
+.bao.i-snooze .bao-idle { animation: b-snooze 3.4s ease-in-out infinite; }
+@keyframes b-breathe { 0%, 100% { transform: translateY(0) scale(1, 1); } 50% { transform: translateY(-3px) scale(1.02, .98); } }
+/* body moves: .a-<name> on the svg, length in --d (js/bao.js MOVES) */
+.bao[class*=" a-"] .bao-rig { animation-duration: var(--d); animation-fill-mode: both; animation-timing-function: ease-in-out; }
+.bao.a-bounce .bao-rig { animation-name: b-bounce; } .bao.a-hop .bao-rig { animation-name: b-hop; } .bao.a-hop2 .bao-rig { animation-name: b-hop2; }
+.bao.a-boing .bao-rig { animation-name: b-boing; } .bao.a-jelly .bao-rig { animation-name: b-jelly; } .bao.a-spin .bao-rig { animation-name: b-spin; }
+.bao.a-flip .bao-rig { animation-name: b-flip; transform-origin: 60px 56px; } .bao.a-backflip .bao-rig { animation-name: b-backflip; transform-origin: 60px 56px; }
+.bao.a-roll .bao-rig { animation-name: b-roll; transform-origin: 60px 56px; } .bao.a-shake .bao-rig { animation-name: b-shake; }
+.bao.a-shiver .bao-rig { animation-name: b-shiver; } .bao.a-tremble .bao-rig { animation-name: b-tremble; animation-timing-function: linear; }
+.bao.a-nod .bao-rig { animation-name: b-nod; } .bao.a-no .bao-rig { animation-name: b-no; } .bao.a-tilt .bao-rig { animation-name: b-tilt; }
+.bao.a-sway .bao-rig { animation-name: b-sway; } .bao.a-wiggle .bao-rig { animation-name: b-wiggle; } .bao.a-dance .bao-rig { animation-name: b-dance; }
+.bao.a-float .bao-rig { animation-name: b-float; } .bao.a-pulse .bao-rig { animation-name: b-pulse; } .bao.a-faint .bao-rig { animation-name: b-faint; }
+.bao.a-deflate .bao-rig { animation-name: b-deflate; } .bao.a-puff .bao-rig { animation-name: b-puff; } .bao.a-lean .bao-rig { animation-name: b-lean; }
+.bao.a-peek .bao-rig { animation-name: b-peek; animation-timing-function: cubic-bezier(.3,1.4,.6,1); } .bao.a-dizzy .bao-rig { animation-name: b-dizzy; }
+.bao.a-sneeze .bao-rig { animation-name: b-sneeze; } .bao.a-stretch .bao-rig { animation-name: b-stretch; }
+.bao.a-squish .bao-rig { animation: b-squish .2s ease-out forwards; } .bao.a-giggle .bao-rig { animation-name: b-giggle; }
+.bao.a-sulk .bao-rig { animation-name: b-sulk; } .bao.a-zoom .bao-rig { animation-name: b-zoom; transform-origin: 60px 60px; }
+.bao.a-stomp .bao-rig { animation-name: b-stomp; } .bao.a-snooze .bao-rig { animation-name: b-snooze; } .bao.a-nom .bao-rig { animation-name: b-nom; }
+.bao.a-jump .bao-rig { animation-name: b-jump; } .bao.a-melt .bao-rig { animation-name: b-melt; }
+.bao.a-hop .bao-shadow, .bao.a-hop2 .bao-shadow, .bao.a-flip .bao-shadow, .bao.a-backflip .bao-shadow, .bao.a-jump .bao-shadow,
+.bao.a-boing .bao-shadow, .bao.a-stomp .bao-shadow, .bao.a-float .bao-shadow { animation: b-shadow var(--d) ease-in-out both; transform-origin: 60px 95px; }
+@keyframes b-shadow { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(.6); opacity: .5; } }
+@keyframes b-bounce { 0% { transform: none; } 30% { transform: scale(1.15, .85); } 60% { transform: translateY(-8px) scale(.92, 1.1); } 100% { transform: none; } }
+@keyframes b-hop { 0% { transform: none; } 20% { transform: scale(1.12, .86); } 50% { transform: translateY(-22px) scale(.94, 1.08); } 80% { transform: scale(1.08, .92); } 100% { transform: none; } }
+@keyframes b-hop2 { 0%, 50%, 100% { transform: none; } 10%, 60% { transform: scale(1.12, .86); } 27%, 77% { transform: translateY(-20px) scale(.94, 1.08); } 42%, 92% { transform: scale(1.08, .92); } }
+@keyframes b-boing { 0% { transform: none; } 15% { transform: scale(1.25, .7); } 35% { transform: translateY(-14px) scale(.85, 1.2); } 55% { transform: scale(1.1, .9); } 75% { transform: scale(.97, 1.04); } 100% { transform: none; } }
+@keyframes b-jelly { 0% { transform: none; } 20% { transform: scale(1.18, .84); } 40% { transform: scale(.88, 1.12); } 60% { transform: scale(1.08, .94); } 80% { transform: scale(.97, 1.03); } 100% { transform: none; } }
+@keyframes b-spin { 0% { transform: none; } 25% { transform: scaleX(.05); } 50% { transform: scaleX(-1); } 75% { transform: scaleX(.05); } 100% { transform: none; } }
+@keyframes b-flip { 0% { transform: none; } 20% { transform: translateY(4px) scale(1.1, .88); } 55% { transform: translateY(-34px) rotate(200deg); } 85% { transform: translateY(0) rotate(360deg) scale(1.08, .92); } 100% { transform: rotate(360deg); } }
+@keyframes b-backflip { 0% { transform: none; } 20% { transform: translateY(4px) scale(1.1, .88); } 55% { transform: translateY(-34px) rotate(-200deg); } 85% { transform: translateY(0) rotate(-360deg) scale(1.08, .92); } 100% { transform: rotate(-360deg); } }
+@keyframes b-roll { 0% { transform: none; } 30% { transform: translateX(-22px) rotate(-120deg); } 70% { transform: translateX(22px) rotate(120deg); } 100% { transform: none; } }
+@keyframes b-shake { 0%, 100% { transform: none; } 20%, 60% { transform: translateX(-4px) rotate(-3deg); } 40%, 80% { transform: translateX(4px) rotate(3deg); } }
+@keyframes b-shiver { 0%, 100% { transform: none; } 10%, 30%, 50%, 70%, 90% { transform: translateX(-1.6px) scale(.98); } 20%, 40%, 60%, 80% { transform: translateX(1.6px) scale(.98); } }
+@keyframes b-tremble { 0%, 100% { transform: none; } 25% { transform: translate(-1.5px, .5px) rotate(-1.5deg); } 50% { transform: translate(1px, -.5px); } 75% { transform: translate(1.5px, .5px) rotate(1.5deg); } }
+@keyframes b-nod { 0%, 50%, 100% { transform: none; } 25%, 75% { transform: translateY(3px) scale(1.03, .94); } }
+@keyframes b-no { 0%, 100% { transform: none; } 17%, 50%, 83% { transform: rotate(-8deg); } 33%, 67% { transform: rotate(8deg); } }
+@keyframes b-tilt { 0%, 100% { transform: none; } 20%, 80% { transform: rotate(-14deg); } }
+@keyframes b-sway { 0%, 100% { transform: none; } 25%, 75% { transform: rotate(-9deg); } 50% { transform: rotate(9deg); } }
+@keyframes b-wiggle { 0%, 100% { transform: none; } 15%, 45%, 75% { transform: rotate(-7deg) translateX(-2px); } 30%, 60%, 90% { transform: rotate(7deg) translateX(2px); } }
+@keyframes b-dance { 0%, 25%, 50%, 75%, 100% { transform: none; } 12.5%, 62.5% { transform: rotate(-11deg) translateY(-8px); } 37.5%, 87.5% { transform: rotate(11deg) translateY(-8px); } }
+@keyframes b-float { 0%, 100% { transform: none; } 50% { transform: translateY(-12px) scale(.97, 1.03); } }
+@keyframes b-pulse { 0%, 40%, 100% { transform: none; } 15%, 55% { transform: scale(1.13); } }
+@keyframes b-faint { 0% { transform: none; } 15% { transform: rotate(-6deg); } 40%, 75% { transform: rotate(84deg) translateY(4px); } 100% { transform: none; } }
+@keyframes b-deflate { 0%, 100% { transform: none; } 35%, 75% { transform: scale(1.08, .8); } }
+@keyframes b-puff { 0%, 100% { transform: none; } 25%, 75% { transform: scale(1.18); } 35%, 55% { transform: scale(1.2) rotate(2deg); } 45%, 65% { transform: scale(1.2) rotate(-2deg); } }
+@keyframes b-lean { 0%, 100% { transform: none; } 30%, 70% { transform: translateY(-4px) scale(1.12); } }
+@keyframes b-peek { 0% { transform: translateY(40px) scale(1, .5); opacity: 0; } 30% { opacity: 1; } 70% { transform: translateY(-8px) scale(.95, 1.06); } 100% { transform: none; } }
+@keyframes b-dizzy { 0%, 100% { transform: none; } 20% { transform: rotate(-12deg) translateX(-5px); } 40% { transform: rotate(9deg) translateX(5px); } 60% { transform: rotate(-6deg) translateX(-3px); } 80% { transform: rotate(4deg); } }
+@keyframes b-sneeze { 0%, 100% { transform: none; } 50% { transform: rotate(-7deg) translateX(-3px) scale(1.04, .92); } 60% { transform: rotate(10deg) translateX(7px) scale(.95, 1.06); } 80% { transform: rotate(-2deg); } }
+@keyframes b-stretch { 0%, 100% { transform: none; } 40%, 70% { transform: scale(.86, 1.24); } 85% { transform: scale(1.08, .92); } }
+@keyframes b-squish { to { transform: scale(1.3, .64); } }
+@keyframes b-giggle { 0%, 100% { transform: none; } 12%, 36%, 60%, 84% { transform: translateY(-3px) scale(.97, 1.03); } 24%, 48%, 72% { transform: scale(1.04, .95); } }
+@keyframes b-sulk { 0%, 100% { transform: none; } 25%, 80% { transform: rotate(9deg) translateX(7px) scale(.96, 1); } }
+@keyframes b-zoom { 0%, 100% { transform: none; } 30%, 70% { transform: scale(1.35) translateY(-4px); } }
+@keyframes b-stomp { 0%, 60%, 100% { transform: none; } 20%, 70% { transform: translateY(-10px); } 35%, 85% { transform: scale(1.2, .8); } }
+@keyframes b-snooze { 0%, 100% { transform: none; } 50% { transform: scale(1.05, .94); } }
+@keyframes b-nom { 0%, 100% { transform: none; } 12%, 37%, 62%, 87% { transform: translateY(2px) scale(1.02, .97); } 25%, 50%, 75% { transform: none; } }
+@keyframes b-jump { 0% { transform: none; } 15% { transform: translateY(-28px) scale(.88, 1.14); } 45% { transform: translateY(-24px); } 70% { transform: scale(1.14, .86); } 100% { transform: none; } }
+@keyframes b-melt { 0%, 100% { transform: none; } 30%, 80% { transform: scale(1.16, .76); } }
+/* the corner Bao that reacts while you study */
+.bao-pop { position: fixed; top: calc(58px + env(safe-area-inset-top)); right: 10px; z-index: 40; pointer-events: none;
+  display: flex; align-items: center; gap: 4px; animation: pop-in .35s cubic-bezier(.3,1.5,.6,1) both; }
+.bao-pop .bao { width: 70px; height: 60px; }
+.bao-pop.out { animation: pop-out .35s ease-in both; }
+.pop-say { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 4px 10px; font-weight: 700; font-size: 15px;
+  white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,.12); }
+@keyframes pop-in { from { transform: translateY(-30px) scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes pop-out { to { transform: translateX(40px) scale(.6); opacity: 0; } }
+/* gallery of faces and moves (Settings → Meet Bao) */
+.bao-stage { display: flex; justify-content: center; padding: 8px 0 4px; } .bao-stage .bao { width: 160px; height: 136px; }
+.bao-stage-name { text-align: center; font-weight: 700; margin-bottom: 6px; min-height: 1.3em; }
+.bao-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px; }
+.bao-grid button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--card); color: var(--ink); font: inherit; font-size: 11px; cursor: pointer; }
+.bao-grid button .bao { width: 56px; height: 48px; }
+.bao-moves { display: flex; flex-wrap: wrap; gap: 6px; }
+.bao-moves button { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 6px 11px; font: inherit; font-size: 13px; cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { .bao *, .bao-pop { animation: none !important; } }

@@ -61,6 +61,45 @@
       "Done! Your brain just did a little workout. It's sweaty. It's fine.",
       "That's how it's done. Same time tomorrow, or I start the guilt trip.",
       "Look at that. Productive AND attractive. Some people have it all."
+    ],
+    "poke": [
+      "Hey. Hey! Fingers off the merchandise.",
+      "Do I look like a stress ball to you? Don't answer that.",
+      "I'm a bun, not a doorbell.",
+      "Poking me doesn't count as studying. I checked.",
+      "Keep that up and I'm filing a complaint with the dumpling union.",
+      "Whoa, whoa. Buy me dinner first. Preferably not me.",
+      "You poke like you study: a lot, and with no plan.",
+      "That tickles. Now go tickle some flashcards."
+    ],
+    "pokeMad": [
+      "OK, that's it. I'm steaming. Literally.",
+      "One more poke and I'm telling your flashcards where you sleep.",
+      "I will roll off this screen and into your nightmares.",
+      "I'm going to need you to channel this energy into Chinese. NOW.",
+      "You've poked me more times than you've reviewed today. Think about that.",
+      "I'm not mad. I'm just going to remember this forever.",
+      "Assault with a deadly finger. Noted.",
+      "Fine. You win. I'm dead. Happy? Go study, murderer."
+    ],
+    "squish": [
+      "Mmmph! Too squishy! Too squishy!",
+      "Personal space! I'm a delicate pastry!",
+      "You're squeezing the pork out of me!",
+      "Is this a hug or an assault? Either way, study after.",
+      "Gentle! I'm a bao, not a stress toy… OK fine, I'm a bit of a stress toy."
+    ],
+    "wake": [
+      "WHAT?! I'm up, I'm up! Were you studying? Liar.",
+      "Ugh, you woke me. This better be for flashcards.",
+      "Five more minutes… no? Fine. Go review something.",
+      "I was dreaming about soy sauce. You ruined it."
+    ],
+    "night": [
+      "It's late. Do a few cards, then let us both sleep.",
+      "Zzz… huh? Oh, it's you. Quick review, then bed. Bed for me, at least.",
+      "Night owl, huh? Owls don't have streaks. You do.",
+      "I'm too sleepy to roast you properly. Just study."
     ]
   },
   "push": {

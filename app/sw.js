@@ -1,6 +1,6 @@
 // Offline support: app shell is precached; stroke data and audio are cached the first time they're used.
-const VERSION = "v15";
-const SHELL = ["./", "index.html", "styles.css?v=15", "js/app.js?v=15", "js/srs.js?v=15", "js/store.js?v=15", "js/sync.js?v=15", "js/grade.js?v=15",
+const VERSION = "v16";
+const SHELL = ["./", "index.html", "styles.css?v=16", "js/app.js?v=16", "js/srs.js?v=16", "js/store.js?v=16", "js/sync.js?v=16", "js/grade.js?v=16", "js/bao.js?v=16",
   "vendor/hanzi-writer.min.js", "data/hsk1.json", "data/charlevels.json", "data/pinyin.json", "data/mascot.json", "manifest.webmanifest", "icon.svg", "icon-180.png"];
 
 // "reload"/"no-cache" make the worker check GitHub for new code instead of trusting the browser's HTTP cache
