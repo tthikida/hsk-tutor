@@ -507,3 +507,4 @@ pre { white-space: pre-wrap; }
 .bao-moves { display: flex; flex-wrap: wrap; gap: 6px; }
 .bao-moves button { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 6px 11px; font: inherit; font-size: 13px; cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { .bao *, .bao-pop { animation: none !important; } }
+.done .btn.ghost { margin-top: 8px; }

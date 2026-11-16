@@ -1,6 +1,6 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "hsk-app", "runtimeExecutable": "python3", "runtimeArgs": ["-m", "http.server", "8123", "--bind", "0.0.0.0", "--directory", "app"], "port": 8123 }
+    { "name": "hsk-app", "runtimeExecutable": "python3", "runtimeArgs": ["-m", "http.server", "8124", "--bind", "0.0.0.0", "--directory", "app"], "port": 8124 }
   ]
 }

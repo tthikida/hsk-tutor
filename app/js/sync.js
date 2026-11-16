@@ -1,7 +1,7 @@
 // Sync progress across devices through one private GitHub Gist.
 // The token (gist permission only) is pasted by the user into Settings and kept on this device only.
 // Every sync = download the cloud copy, merge it with this device's progress, upload the result.
-import * as store from "./store.js?v=17";
+import * as store from "./store.js?v=18";
 
 const SKEY = "hsk-tutor-sync";            // {token, gistId, lastSync, lastError} — never exported or uploaded
 const FILE = "hsk-tutor-progress.json";

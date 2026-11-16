@@ -1,8 +1,8 @@
-import { newCard, review, preview } from "./srs.js?v=17";
-import * as store from "./store.js?v=17";
-import * as sync from "./sync.js?v=17";
-import { gradeStrokes, verdict } from "./grade.js?v=17";
-import * as bao from "./bao.js?v=17";
+import { newCard, review, preview } from "./srs.js?v=18";
+import * as store from "./store.js?v=18";
+import * as sync from "./sync.js?v=18";
+import { gradeStrokes, verdict } from "./grade.js?v=18";
+import * as bao from "./bao.js?v=18";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -581,6 +581,28 @@ function startSession() {
   nextCard();
 }
 
+/** Bonus round once today's work is finished: a few new items past the daily limit,
+ *  plus the reviews coming due soonest (FSRS accounts for reviewing them early). */
+const EXTRA_NEW = 3, EXTRA_TOTAL = 10;
+function startExtra() {
+  const fresh = nextNewItems(EXTRA_NEW).map(key => ({ kind: "intro", key }));
+  const now = Date.now();
+  const ahead = Object.entries(allCards())
+    .filter(([id, c]) => !id.startsWith("p:") && c.due > now)
+    .sort((a, b) => a[1].due - b[1].due)
+    .slice(0, EXTRA_TOTAL - fresh.length)
+    .map(([id]) => ({ kind: "card", id }));
+  shuffle(ahead);
+  const q = [];
+  while (ahead.length || fresh.length) {
+    for (let k = 0; k < 3 && ahead.length; k++) q.push(ahead.shift());
+    if (fresh.length) q.push(fresh.shift());
+  }
+  if (!q.length) return renderHome();
+  session = { q, done: 0, startedWith: q.length, extra: true };
+  nextCard();
+}
+
 /* ---------------- daily streak ---------------- */
 const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const daysBefore = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() - n);
@@ -865,11 +887,15 @@ function renderCard(cid) {
 function renderDone() {
   const n = session?.done || 0;
   session = null;
+  // cards can come due during a long session (relearns, listen facets); offer those first
+  const more = dueCards().length + store.newLeftToday() > 0;
   view().innerHTML = `<main class="card done"><div class="hz big">好</div>
     <h2>All done for now</h2><p class="muted">${n} review${n === 1 ? "" : "s"} this session.</p>
     ${mascotHTML("session")}
     ${streakHTML()}
-    <button class="btn primary full" data-home>Home</button></main>`;
+    <button class="btn primary full" data-more>${more ? "Keep studying" : "Study a few more"}</button>
+    <button class="btn ghost full" data-home>Home</button></main>`;
+  $("[data-more]").onclick = more ? startSession : startExtra;
   bindHome(view());
 }
 
@@ -1079,7 +1105,9 @@ function renderHome() {
       <div class="today-label"><span>Today</span><span>${pct === 100 ? (doneToday ? `All done ✓ <b>${doneToday}</b> reviewed` : "Nothing to study") : `<b>${doneToday}</b> of <b>${todo}</b> done`}</span></div>
       <div class="progress ${pct === 100 ? "full" : ""}" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="Today's study progress"><div style="width:${pct}%"></div></div>
     </div>
-    <button class="btn primary full big" data-study ${due + left === 0 ? "disabled" : ""}>${due + left === 0 ? "Nothing due — come back later" : "Study"}</button>
+    ${due + left === 0
+      ? `<button class="btn full big" data-extra>Study a few more <small class="muted">· bonus round</small></button>`
+      : `<button class="btn primary full big" data-study>Study</button>`}
     ${homeChartHTML()}
     <div class="tiles">
       <button class="tile" data-go="pad">✍️<span>Writing pad</span></button>
@@ -1088,7 +1116,9 @@ function renderHome() {
       <button class="tile" data-go="settings">⚙️<span>Settings</span></button>
     </div>
   </main>`;
-  $("[data-study]").onclick = startSession;
+  const sb = $("[data-study]"), xb = $("[data-extra]");
+  if (sb) sb.onclick = startSession;
+  if (xb) xb.onclick = startExtra;
   updateBadge();
   $("[data-chart]").onclick = () => { chartScroll = 0; renderChart(); };
   view().querySelectorAll("[data-go]").forEach(b => b.onclick = () => ({ pad: () => renderPad(), pron: () => renderPron(), browse: renderBrowse, settings: renderSettings })[b.dataset.go]());
